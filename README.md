@@ -35,12 +35,12 @@ Want to build your own agent instead? See [thruuu-claude-content-strategist](htt
 
 ## Credits
 
-Reading data never costs credits. The Content Pipeline does, and the skills always show the cost and ask before spending anything. Costs per step are in the [Content Pipeline reference](docs/content-pipeline-api.md).
+Reading data never costs credits. The Content Pipeline does, and the skills always show the cost and ask before spending anything. Costs per step are in the [Content Pipeline reference](https://thruuu.com/learn/content-pipeline-api/).
 
 ## Docs
 
 - [How it works](docs/how-it-works.md): skills, API calls, scoring and data traps.
-- API references: [Topic Clusters](docs/topic-clusters-api.md), [AI Overview monitoring](docs/aio-monitoring-api.md), [Content Pipeline](docs/content-pipeline-api.md).
+- API references: [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
 
 ## License
 

@@ -2,7 +2,7 @@
 
 Technical reference for developers and agents: what each skill does, which API calls it makes, how the plan is scored, and the data traps to know about. The method behind the plan is explained on the thruuu blog.
 
-The three skills run over the thruuu REST API v2. Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: `aio-monitoring-api.md`, `topic-clusters-api.md`, `content-pipeline-api.md`.
+The three skills run over the thruuu REST API v2. Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
 
 ## The skills
 
@@ -39,7 +39,7 @@ Install the three folders together (for example in `~/.claude/skills/`). They wo
 | Top 10 per keyword | same, `include=topOrganicResults`, one pass on the latest run, keeping the main keyword and up to 2 AI Overview keywords per cluster (`top10_per_cluster` 3) | The exact results page of the keywords that matter |
 | One keyword | same, `include=aiOverview,topOrganicResults` (one comma-separated value; a repeated `include` is a 400), paged until found | A question about a single keyword |
 | Cluster Mixed SERP | `GET .../clusters/{clusterId}` (`/paa`, `/related-searches` on demand) | Format evidence for the P1 and P2 rows, at most 15 calls |
-| Content Pipeline | `POST/GET /api/v2/pipeline/items...`, `GET /api/v2/briefs/{id}` | Push, status, brief, review, draft (see `content-pipeline-api.md`) |
+| Content Pipeline | `POST/GET /api/v2/pipeline/items...`, `GET /api/v2/briefs/{id}` | Push, status, brief, review, draft (see the [Content Pipeline reference](https://thruuu.com/learn/content-pipeline-api/)) |
 
 A full pull for a 300-cluster project is about 14 calls, plus up to 15 for the top rows' Mixed SERPs. On the 403-keyword example, the top 10 pass took 3 calls and kept 334 keywords (one lookup per keyword would have taken 497). Rate limit: 100 calls per 10 seconds. The skills never call `POST .../scrape`.
 
