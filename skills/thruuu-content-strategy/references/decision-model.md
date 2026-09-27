@@ -1,6 +1,6 @@
 # Decision model
 
-How `analyze.py` turns clusters into rows, actions and priorities. Values live in `scripts/thresholds.json`; this file gives the reason for each. The guide (`content-strategy-guide.md`, section 4) uses the same rule numbers.
+How `analyze.py` turns clusters into rows, actions and priorities. Values live in `scripts/thresholds.json`; this file gives the reason for each.
 
 ## Contents
 
