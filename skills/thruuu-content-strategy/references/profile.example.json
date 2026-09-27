@@ -1,0 +1,20 @@
+{
+  "_doc": "Business profile read by analyze.py. Required (or run with --no-profile when the user declines). Business value: 3 = the product is the natural answer, 2 = related, 1 = awareness only. List anything the user did not confirm in `assumptions`; the report then carries a warning.",
+  "domain": "example.com",
+  "offer": "What the company sells, one sentence.",
+  "audience": "Who buys it, one sentence.",
+  "brandNames": ["Example", "Example App"],
+  "competitors": [
+    {"name": "Rival One", "aliases": ["RivalOne", "Rival One Pro"], "domain": "rivalone.com"},
+    {"name": "Rival Two", "aliases": [], "domain": "rivaltwo.com"}
+  ],
+  "conquest": {"include": true, "businessValue": 3, "navigational": false},
+  "businessValue": {
+    "default": 2,
+    "categories": {"Pricing and Costs": 3, "General Definitions": 1},
+    "keywordContains": {"alternative": 3, "pricing": 3, "what is": 1}
+  },
+  "skipCategories": ["Careers"],
+  "skipKeywordContains": ["login", "jobs"],
+  "assumptions": []
+}
