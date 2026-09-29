@@ -7,9 +7,11 @@
   pipeline.py brief   TARGET [--save]
   pipeline.py approve TARGET [--yes | --dry-run]
   pipeline.py draft   TARGET [--format md|docx|json] [--out DIR]
+  pipeline.py delete  TARGET [--yes | --dry-run]
+  pipeline.py archive TARGET [--yes | --dry-run]
 
 TARGET is a plan row number (needs --plan and --ledger), an item id, or a keyword already in the pipeline.
-Every POST (push, launch, approve) prints its credit estimate and stops unless --yes is given; --dry-run
+Every POST (push, launch, approve) prints its credit estimate and stops unless --yes is given; delete and archive (free, no refund) also need --yes; --dry-run
 prints the exact request and never sends it. GET calls never spend credits.
 """
 import argparse
@@ -389,10 +391,69 @@ def cmd_draft(c, a):
         with open(path, "wb") as f:
             f.write(body)
     print(f"Saved '{title}' ({meta.get('wordCount')} words, {meta.get('language')}) to {path}. Meta description: {(meta.get('metaDescription') or 'none').rstrip('.')}.")
-    print("Archive the item in thruuu (or via the API) once collected, to free its pipeline slot.")
+    print(f"Archive it to free its pipeline slot: pipeline.py archive {it['id']} (free, needs --yes).")
     if led is not None and key:
         e = led["rows"][key]
         e.setdefault("pipeline", {}).update({"status": "ready", "draftPath": path, "metaTitle": meta.get("metaTitle"), "collectedAt": now()})
+        save(a.ledger, led)
+
+
+# ---------- delete / archive ----------
+DELETABLE = ("not_started", "error", "no_credits")
+
+
+def cmd_delete(c, a):
+    it, key = resolve(c, a, a.target)
+    if it["status"] not in DELETABLE:
+        sys.exit(f"'{it['keyword']}' is {it['status']}: it has already run and cannot be deleted. Only not_started, error and no_credits items can be.")
+    print(f"Delete '{it['keyword']}' (item {it['id']}, {it['status']}): removes it from the pipeline, free, and refunds nothing already charged. "
+          "Its brief or analysis, if any, stay in thruuu.")
+    if a.dry_run:
+        print(f"DRY RUN, not sent: DELETE /api/v2/pipeline/items/{it['id']} {json.dumps(ws_params(a))}")
+        return
+    if not a.yes:
+        print("Nothing sent. Rerun with --yes only after the user confirms the delete.")
+        return
+    try:
+        c.request("DELETE", f"/pipeline/items/{it['id']}", ws_params(a))
+    except ApiError as e:
+        if e.json().get("error") == "item_not_deletable":
+            sys.exit(f"'{it['keyword']}' has already run and can no longer be removed.")
+        raise
+    print(f"Deleted '{it['keyword']}'.")
+    led = ledger_rows(a)
+    ent = (pipeline_by_item(led).get(it["id"]) or (None, None))[1]
+    if ent is not None:
+        ent.pop("pipeline", None)
+        if ent.get("status") == "in_progress":
+            ent["status"] = "planned"
+        save(a.ledger, led)
+        print(f"Cleared the pipeline entry in {a.ledger}; the keyword can be pushed again.")
+
+
+def cmd_archive(c, a):
+    it, key = resolve(c, a, a.target)
+    if it["status"] != "ready":
+        sys.exit(f"'{it['keyword']}' is {it['status']}: only an item whose draft is ready can be archived. Use delete for an unfinished item.")
+    print(f"Archive '{it['keyword']}' (item {it['id']}): frees its pipeline slot, free. The draft stays in thruuu. Collect it first with `draft`.")
+    body = {"workspace_id": a.workspace} if a.workspace else {}
+    if a.dry_run:
+        print(f"DRY RUN, not sent: POST /api/v2/pipeline/items/{it['id']}/archive {json.dumps(body)}")
+        return
+    if not a.yes:
+        print("Nothing sent. Rerun with --yes once the user confirms.")
+        return
+    try:
+        c.request("POST", f"/pipeline/items/{it['id']}/archive", body=body)
+    except ApiError as e:
+        if e.json().get("error") == "not_archivable":
+            sys.exit(f"'{it['keyword']}' cannot be archived yet: only items whose draft is ready can be.")
+        raise
+    print(f"Archived '{it['keyword']}'.")
+    led = ledger_rows(a)
+    ent = (pipeline_by_item(led).get(it["id"]) or (None, None))[1]
+    if ent is not None:
+        ent["pipeline"].update({"status": "archived", "archivedAt": now()})
         save(a.ledger, led)
 
 
@@ -418,7 +479,7 @@ def main():
     p.add_argument("--language")
     p.add_argument("--device")
     p.add_argument("--search-engine")
-    for name in ("launch", "status", "brief", "approve", "draft"):
+    for name in ("launch", "status", "brief", "approve", "draft", "delete", "archive"):
         q = sub.add_parser(name)
         common(q)
         if name != "status":
@@ -429,14 +490,14 @@ def main():
         if name == "draft":
             q.add_argument("--format", choices=["md", "docx", "json"], default="md")
             q.add_argument("--out")
-    for name in ("push", "launch", "approve"):
+    for name in ("push", "launch", "approve", "delete", "archive"):
         q = sub.choices[name]
         q.add_argument("--yes", action="store_true", help="the user confirmed the credits")
         q.add_argument("--dry-run", action="store_true", help="print the request, send nothing")
     a = ap.parse_args()
     c = Client()
     try:
-        {"push": cmd_push, "launch": cmd_launch, "status": cmd_status, "brief": cmd_brief, "approve": cmd_approve, "draft": cmd_draft}[a.cmd](c, a)
+        {"push": cmd_push, "launch": cmd_launch, "status": cmd_status, "brief": cmd_brief, "approve": cmd_approve, "draft": cmd_draft, "delete": cmd_delete, "archive": cmd_archive}[a.cmd](c, a)
     except ApiError as e:
         err = e.json()
         sys.exit(f"{err.get('error') or 'HTTP ' + str(e.status)}: {err.get('message') or e}")

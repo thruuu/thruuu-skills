@@ -10,7 +10,7 @@ The three skills run over the thruuu REST API v2. Rule thresholds and their reas
 |---|---|---|
 | `thruuu-data-pull` | Key check, pairing, snapshot (any past run, month-over-month pair, capped top 10 pass), cluster details, one-keyword lookup. Holds the API client the pipeline skill reuses; GET only. | One tested place for auth, pagination, rate limits and GET only. |
 | `thruuu-content-strategy` | Profile interview, join, score, site check, plan, review, report, compare, ledger. | The repeatable core, offline on the snapshot (the site check is cached in it), so reruns are reproducible. |
-| `thruuu-content-pipeline` | Push rows or keywords to the Content Pipeline, status, brief digest, approve on request, collect drafts. | The only skill that spends credits, so every charge sits behind one confirmation step. |
+| `thruuu-content-pipeline` | Push rows or keywords to the Content Pipeline, status, brief digest, approve on request, collect drafts, delete unstarted or stopped items, archive collected ones. | The only skill that spends credits, so every charge sits behind one confirmation step. |
 
 Install the three folders together (for example in `~/.claude/skills/`). They work in Claude Code; on claude.ai only if the thruuu API host is on the network allowlist; not in the Claude API skills runtime, which has no network. The site check needs the WebSearch tool; without it, the sitemap fallback needs network access to the client's site. The API key comes from `THRUUU_API_KEY` (Settings > API, Professional or Agency plan) and is never printed; `THRUUU_API_BASE` defaults to `https://api.thruuu.com`.
 
@@ -39,7 +39,7 @@ Install the three folders together (for example in `~/.claude/skills/`). They wo
 | Top 10 per keyword | same, `include=topOrganicResults`, one pass on the latest run, keeping the main keyword and up to 2 AI Overview keywords per cluster (`top10_per_cluster` 3) | The exact results page of the keywords that matter |
 | One keyword | same, `include=aiOverview,topOrganicResults` (one comma-separated value; a repeated `include` is a 400), paged until found | A question about a single keyword |
 | Cluster Mixed SERP | `GET .../clusters/{clusterId}` (`/paa`, `/related-searches` on demand) | Format evidence for the P1 and P2 rows, at most 15 calls |
-| Content Pipeline | `POST/GET /api/v2/pipeline/items...`, `GET /api/v2/briefs/{id}` | Push, status, brief, review, draft (see the [Content Pipeline reference](https://thruuu.com/learn/content-pipeline-api/)) |
+| Content Pipeline | `POST/GET /api/v2/pipeline/items...`, `GET /api/v2/briefs/{id}` | Push, status, brief, review, draft, `DELETE /pipeline/items/{id}`, `POST /pipeline/items/{id}/archive` (see the [Content Pipeline reference](https://thruuu.com/learn/content-pipeline-api/)) |
 
 A full pull for a 300-cluster project is about 14 calls, plus up to 15 for the top rows' Mixed SERPs. On the 403-keyword example, the top 10 pass took 3 calls and kept 334 keywords (one lookup per keyword would have taken 497). Rate limit: 100 calls per 10 seconds. The skills never call `POST .../scrape`.
 

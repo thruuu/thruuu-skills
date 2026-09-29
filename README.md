@@ -12,7 +12,7 @@ Want to build your own agent instead? See [thruuu-claude-content-strategist](htt
 |---|---|
 | [`thruuu-data-pull`](skills/thruuu-data-pull/SKILL.md) | Reads your Topic Clusters projects and AI Overview reports through the API. Read-only, never spends credits. Also answers questions about a single keyword: what the AI Overview says, which sources it cites, and the top 10. |
 | [`thruuu-content-strategy`](skills/thruuu-content-strategy/SKILL.md) | Builds the plan: a prioritised list of pages to create or refresh, with the data behind each decision, your visibility in AI Overviews against competitors, and content guidance for each page. Re-run it monthly to see what changed. |
-| [`thruuu-content-pipeline`](skills/thruuu-content-pipeline/SKILL.md) | Sends the pages you choose to the thruuu Content Pipeline (analysis, brief, draft), shows each brief in the chat for approval, and saves the finished drafts. Always shows the credit cost and waits for your yes. |
+| [`thruuu-content-pipeline`](skills/thruuu-content-pipeline/SKILL.md) | Sends the pages you choose to the thruuu Content Pipeline (analysis, brief, draft), shows each brief in the chat for approval, saves the finished drafts, and deletes or archives items to free slots. Always shows the credit cost and waits for your yes. |
 
 ## What you need
 
