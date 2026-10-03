@@ -39,7 +39,7 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/pull.py check
 
 ## Commands
 
-**List and pair.** Shows projects that have a domain and are Done, and reports with at least one completed run, then pairing hints (same domain, country, language, device). `--all` shows everything.
+**List and pair.** Shows projects that have a domain and are Done, and reports with at least one completed run, then pairing hints (same domain, country, language, device). `--all` shows everything. Failed projects are counted separately from other hidden ones, and `snapshot` stops on a Failed project with a message to rerun it in thruuu, because its data is incomplete.
 
 ```bash
 python3 ${CLAUDE_SKILL_DIR}/scripts/pull.py list

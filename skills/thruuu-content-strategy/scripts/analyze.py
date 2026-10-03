@@ -986,7 +986,7 @@ def main():
             "businessValue": s["bv"], "businessValueFromProfile": s["bvKnown"],
             "score": s["score"], "priority": s["prio"], "effort": effort, "flags": sorted(set(s["flags"])), "format": list(dict.fromkeys(f for m in members for f in m["format"])),
             "scoreBreakdown": (f"demand {s['demand']} ({fmt_n(s['demandVol'])}/mo" + (", unknown: neutral" if s["demandVol"] is None else "") + f") x opportunity {s['opp']} ({s['oppKey'].replace('_', ' ')})"
-                               f" x competition {s['cf']} ({s['label']}, avg PR {s['pr']} vs yours {own_pr}) x AIO {s['amod']} ({s['aioKey'].replace('_', ' ')})"
+                               f" x competition {s['cf']} ({s['label']}, avg PR {'n/a' if s['pr'] is None else s['pr']} vs yours {own_pr}) x AIO {s['amod']} ({s['aioKey'].replace('_', ' ')})"
                                f" x business value {s['bv']}/2" + ("" if s["bvKnown"] else " (default)")),
             "rationale": " ".join(parts), "success": success, "successCheck": check,
             "secondaryKeywords": [by_id[i]["mainKw"] for i in r["clusters"] if i != r["primary"]],

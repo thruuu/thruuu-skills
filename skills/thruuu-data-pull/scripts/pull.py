@@ -64,7 +64,9 @@ def cmd_list(c, a):
     reports = list(c.paginate("/aio-reports", "items", 100))
     usable_p = [p for p in projects if a.all or (p.get("domain") and p.get("status") == "Done")]
     usable_r = [r for r in reports if a.all or (r.get("resultsTotal") or 0) > 0]
-    print(f"TOPIC CLUSTER PROJECTS ({len(usable_p)} shown, {len(projects) - len(usable_p)} hidden: no domain or not Done; --all to show)")
+    failed = sum(1 for p in projects if p.get("status") == "Failed" and p not in usable_p)
+    other = len(projects) - len(usable_p) - failed
+    print(f"TOPIC CLUSTER PROJECTS ({len(usable_p)} shown, {other} hidden: no domain or not Done, {failed} failed; --all to show)")
     for p in usable_p:
         sp = p.get("searchParam") or {}
         print(f"  {p['id']}  {p['status']:<11} {p['createdAt'][:10]}  domain={p.get('domain')}  "
@@ -120,6 +122,8 @@ def cmd_snapshot(c, a):
     warnings = []
 
     project = c.get(f"/topic-clusters/{a.project}")
+    if project.get("status") == "Failed":
+        sys.exit(f"Topic Cluster project {a.project} failed in thruuu, so its data is incomplete. Rerun it in thruuu, then pull again.")
     write(os.path.join(out, "tc_project.json"), project)
     if project.get("status") != "Done":
         warnings.append(f"Topic Cluster project status is {project.get('status')}, not Done.")
