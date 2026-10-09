@@ -39,6 +39,7 @@
     "aio":              "present" | "absent" | "degraded"   used for the summary count and the "no AI Overview" line in details
     "headingQuestions": [ { "q": string, "count": number } ]
     "topics":           [ string ]
+    "relatedSearches":  [ string ]
     "aioQuestions":     [ string ]
     "citedQuestions":   [ { "q": string, "count": number } ]
     "brands":           [ string ]                  NOT shown per question. Only feeds the Brand view roll-up.
@@ -352,7 +353,8 @@
   function detail(n) {
     var d = h('div', { class: 'detail' }, h('h4', { text: 'Questions on ranking pages' }), list(n.headingQuestions, true),
       h('h4', { text: 'Top topics' }),
-      (n.topics && n.topics.length) ? h('p', { text: n.topics.join(', ') }) : h('div', { class: 'empty', text: 'None found.' }));
+      (n.topics && n.topics.length) ? h('p', { text: n.topics.join(', ') }) : h('div', { class: 'empty', text: 'None found.' }),
+      h('h4', { text: 'Related searches' }), list(n.relatedSearches, false));
     if (n.aio === 'absent') {
       d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: 'No AI Overview appeared on this SERP.' }));
     } else {

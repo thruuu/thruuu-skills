@@ -5,7 +5,7 @@ This skill is an unpublished admin build. Delete this file and the "Unpublished 
 ## Prerequisites
 
 - An admin account with the thruuu MCP server connected in your client. Connection steps are in the MCP server reference.
-- The Question Explorer MCP changes (get_serp_analysis with topics, and brands in the AI Overview) deployed on the environment you point at.
+- The Question Explorer MCP changes (get_serp_analysis with topics, brands in the AI Overview, and `include` related_searches) deployed on the environment you point at.
 
 ## Claude Code
 

@@ -74,6 +74,9 @@ def walk(node, path, stats, brands_seen):
         node["brands"] = dedupe_brands(node["brands"], path)
         for b in node["brands"]:
             brands_seen.add(b.lower())
+    rs = node.get("relatedSearches")
+    if "relatedSearches" in node and (not isinstance(rs, list) or not all(isinstance(r, str) and r.strip() for r in rs)):
+        fail(path + ".relatedSearches must be a list of non-empty strings")
     paa = node.get("paa", [])
     if not isinstance(paa, list):
         fail(path + ".paa must be a list")
