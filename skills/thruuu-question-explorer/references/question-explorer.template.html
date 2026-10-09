@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<!--
+  Variant: B2, light outline. One thing per view.
+  Idea: Questions view is the question tree (text rows, collapsible) plus a right details panel opened by clicking a question. Brand view is only the ranked brand roll-up. Details hold only what is unique to that question (no brands, no PAA list).
+  Row indicator: a grey bulleted-list icon + count (number of on-page questions) at the row end, only on rows that have some. At 760px and below the panel becomes a bottom sheet.
+  Tradeoff vs B: no chips, no badges, no stat cards, no tinted rows. Brand to question highlighting is gone; the two views never mix.
+
+  NOT a thruuu-client Vue component. Standalone page that Claude fills on every run.
+  Only the JSON block with id="qe-data" changes between runs. HTML, CSS and JS stay fixed.
+
+  ============================ DATA CONTRACT ============================
+  Unchanged from variants A and B.
+
+  <script type="application/json" id="qe-data"> holds ONE object:
+
+  {
+    "meta": {
+      "seed":            string   seed keyword, shown verbatim
+      "country":         string   e.g. "United States"
+      "language":        string   e.g. "English"
+      "device":          string   "Desktop" | "Mobile"
+      "date":            string   display date, e.g. "Oct 6, 2026"
+      "creditsUsed":     number   approximate credits spent
+      "searchesRun":     number   SERP analyses started
+      "questionsFound":  number   unique questions drawn (levels 1 to 3)
+      "repeatedSkipped": number   repeated questions skipped (dedup), 0 allowed
+      "view":            "questions" | "brands"   optional, default "questions"
+      "highlightBrand":  string   optional, brand emphasised in Brand view (default: top brand)
+    },
+    "tree": Node     the seed node (level 0)
+  }
+
+  Node (analysed: seed, level 1, level 2):
+  {
+    "q":                string
+    "analysed":         boolean                     optional, default true. false = muted leaf, no details
+    "note":             string                      optional. NOT DISPLAYED in B2
+    "thruuuUrl":        string                      "Open in thruuu" link target
+    "aio":              "present" | "absent" | "degraded"   used for the summary count and the "no AI Overview" line in details
+    "headingQuestions": [ { "q": string, "count": number } ]
+    "topics":           [ string ]
+    "aioQuestions":     [ string ]
+    "citedQuestions":   [ { "q": string, "count": number } ]
+    "brands":           [ string ]                  NOT shown per question. Only feeds the Brand view roll-up.
+    "paa":              [ Node | string ]           children. A plain string = level 3 question, shown muted, not analysed.
+  }
+
+  Derived by the page, never supplied: level, brand roll-up (nodes + level 1 branches), counts.
+  All text is inserted with textContent.
+  ======================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Question explorer</title>
+<style>
+  :root {
+    --primary: #EB8F10;
+    --primary-dark: #CA7B0E;
+    --black: #060A15;
+    --charcoal: #344054;
+    --grey: #60697A;
+    --stroke: #E4E4E7;
+    --stroke-l1: #ECECEE;
+    --disabled: #D6D6D6;
+    --card: #FFFFFF;
+    --page-a: #FFF9F0;
+    --page-b: #F7F7F8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --primary-dark: #CA7B0E;
+      --black: #F4F5F7;
+      --charcoal: #C9CEDA;
+      --grey: #9AA2B2;
+      --stroke: #2E3442;
+      --stroke-l1: #262B37;
+      --disabled: #4A5060;
+      --card: #141821;
+      --page-a: #12151D;
+      --page-b: #0C0E14;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 500;
+    color: var(--black);
+    background: linear-gradient(180deg, var(--page-a) 0%, var(--page-b) 55%);
+    min-height: 100vh;
+  }
+  .page { max-width: 1200px; margin: 0 auto; padding: 14px 28px 20px; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; height: 36px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font: 700 16px 'Archivo', sans-serif; }
+  .word { font-weight: 800; font-size: 1.125rem; }
+  .sep { width: 1px; height: 18px; background: var(--stroke); margin: 0 4px; }
+  .surface { color: var(--grey); font-weight: 600; font-size: 0.9375rem; }
+  .made { font-size: 0.8125rem; font-weight: 600; color: var(--grey); }
+  .made b { color: var(--primary-dark); font-weight: 800; }
+
+  .hero { margin: 8px 0 14px; }
+  h1 { margin: 0 0 4px; font-size: 1.625rem; line-height: 2.1rem; font-weight: 600; }
+  h1 .seed-em { color: var(--primary); font-weight: 700; }
+  .line { font-size: 0.875rem; line-height: 1.25rem; color: var(--grey); font-weight: 500; }
+  .line + .line { margin-top: 2px; color: var(--charcoal); font-weight: 600; }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--stroke); border-radius: 0.375rem; background: var(--card); padding: 2px; }
+  .seg button { font: 600 0.875rem 'Manrope', sans-serif; color: var(--charcoal); background: transparent; border: 0; border-radius: 0.25rem; padding: 6px 14px; cursor: pointer; }
+  .seg button.on { background: var(--primary); color: #fff; }
+  .btn { font: 600 0.875rem 'Manrope', sans-serif; color: var(--primary-dark); background: transparent; border: 1px solid var(--primary-dark); border-radius: 0.375rem; padding: 6px 14px; cursor: pointer; }
+
+  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 10px; box-shadow: 0px 10px 30px 0px rgba(228,228,228,0.15); overflow: hidden; margin-bottom: 12px; }
+  .card h3 { margin: 0; font-size: 1.125rem; line-height: 1.6rem; font-weight: 600; }
+  .card p.sub { margin: 2px 0 0; color: var(--charcoal); font-size: 0.875rem; line-height: 1.25rem; }
+  .chead { padding: 12px 22px 10px; }
+
+  /* question outline: text only */
+  ul.ol { list-style: none; margin: 0; padding: 0; }
+  ul.ol ul.ol { margin-left: 28px; }
+  .row { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 6px 22px 6px 16px; }
+  .row.lv0 { padding-top: 8px; padding-bottom: 8px; border-top: 1px solid var(--stroke-l1); }
+  .chev { width: 22px; height: 22px; border: 0; background: none; color: var(--grey); padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .chev svg { transition: transform .15s; }
+  .chev.open svg { transform: rotate(90deg); }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--disabled); margin: 0 auto; }
+  .q { font-size: 0.9375rem; line-height: 1.3rem; font-weight: 500; color: var(--black); }
+  .q.btnlike { background: none; border: 0; padding: 3px 8px; margin: -3px -8px; width: calc(100% + 16px); border-radius: 6px; text-align: left; font-family: inherit; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--black); }
+  /* quiet indicator: icon + count, grey, no fill. Only on rows with on-page questions */
+  .ind { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--grey); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .ind svg { display: block; }
+  .lv0 .q { font-size: 1.0625rem; font-weight: 700; }
+  .lv1 .q { font-weight: 600; }
+  .leaf .q { font-size: 0.875rem; color: var(--grey); }
+  /* selected row: faint neutral tint, bolder text, indicator darkens. No border accent. */
+  .row.sel .q.btnlike { background: rgba(96,105,122,0.10); }
+  .row.sel .q { font-weight: 700; }
+  .row.sel .ind { color: var(--charcoal); }
+
+  /* split: tree left, details panel right */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+  .split > .card { margin-bottom: 12px; }
+  .panel { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+  .panel .phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 22px 10px; }
+  .panel .phead h3 { font-size: 1.0625rem; line-height: 1.5rem; }
+  .panel .phead p.sub { margin-top: 2px; }
+  .pclose { flex: none; width: 28px; height: 28px; border: 0; background: none; color: var(--grey); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .pempty { padding: 28px 22px 32px; border-top: 1px solid var(--stroke-l1); text-align: center; }
+  .pempty svg { color: var(--disabled); margin-bottom: 8px; }
+  .pempty .t { font-size: 0.9375rem; font-weight: 600; margin: 0 0 4px; }
+  .pempty .s { font-size: 0.8125rem; line-height: 1.2rem; color: var(--grey); margin: 0; }
+
+  /* details: no fill, no box, single column inside the panel */
+  .detail { padding: 6px 22px 16px; border-top: 1px solid var(--stroke-l1); }
+  .detail h4:first-child { margin-top: 6px; }
+  .detail h4 { margin: 0 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--grey); }
+  .detail h4:not(:first-child) { margin-top: 16px; }
+  .detail ul { list-style: none; margin: 0; padding: 0; }
+  .detail li { display: flex; justify-content: space-between; gap: 10px; font-size: 0.8125rem; line-height: 1.2rem; font-weight: 400; color: var(--black); padding: 2px 0; }
+  .detail li .c { color: var(--grey); font-weight: 600; white-space: nowrap; }
+  .detail p { margin: 0; font-size: 0.8125rem; line-height: 1.2rem; font-weight: 400; color: var(--black); }
+  .empty { font-size: 0.8125rem; color: var(--grey); }
+  .link { display: inline-block; margin-top: 12px; font-size: 0.8125rem; font-weight: 600; color: #4F46E5; text-decoration: none; }
+
+  /* brand roll-up: ranked list only */
+  .rhead, .rrow { display: grid; grid-template-columns: 28px 160px minmax(0, 1fr) 72px 96px; align-items: center; column-gap: 14px; padding: 0 22px; }
+  .rhead { height: 30px; border-top: 1px solid var(--stroke-l1); border-bottom: 1px solid var(--stroke-l1); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); }
+  .rhead .n, .rrow .n { text-align: right; }
+  .rrow { height: 34px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; cursor: pointer; }
+  .rrow:last-child { border-bottom: 0; }
+  .rk { color: var(--grey); font-weight: 600; font-size: 0.8125rem; }
+  .nm { font-weight: 600; }
+  .bar { height: 5px; border-radius: 3px; background: var(--stroke-l1); }
+  .bar i { display: block; height: 100%; border-radius: 3px; background: var(--disabled); }
+  .rrow.sel .nm { font-weight: 800; }
+  .rrow.sel .bar i { background: var(--primary); }
+  .showall { margin: 10px 22px 14px; }
+
+  .foot { font-size: 0.75rem; color: var(--grey); font-weight: 600; display: flex; justify-content: space-between; gap: 16px; }
+
+  @media (max-width: 1000px) {
+    .split { grid-template-columns: minmax(0, 1fr) 320px; }
+    .rhead, .rrow { grid-template-columns: 24px 110px minmax(0, 1fr) 56px 80px; }
+  }
+  /* narrow: panel becomes a bottom sheet, only while a question is selected; tree keeps full width */
+  @media (max-width: 760px) {
+    .page { padding: 12px 14px 20px; }
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; max-height: 68vh; border-radius: 14px 14px 0 0; margin: 0; z-index: 10; box-shadow: 0 -10px 30px rgba(0,0,0,0.12); }
+    .split:not(.has-sel) .panel { display: none; }
+    .split.has-sel #qcard { margin-bottom: 40vh; }
+    ul.ol ul.ol { margin-left: 14px; }
+    .row { padding: 6px 12px 6px 8px; column-gap: 4px; }
+    .chead { padding-left: 14px; padding-right: 14px; }
+    .toolbar { flex-wrap: wrap; }
+    .rhead, .rrow { grid-template-columns: 20px 90px minmax(0, 1fr) 48px; padding: 0 12px; }
+    .rhead span:last-child, .rrow span:last-child { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="brand"><span class="mark">t</span><span class="word">thruuu</span><span class="sep"></span><span class="surface">Question explorer</span></div>
+    <div class="made">Made with <b>thruuu</b></div>
+  </header>
+
+  <section class="hero">
+    <h1>Question tree for <span class="seed-em" id="seed"></span></h1>
+    <div class="line" id="meta"></div>
+    <div class="line" id="stats"></div>
+  </section>
+
+  <div class="toolbar">
+    <div class="seg" id="seg">
+      <button data-v="questions">Questions</button>
+      <button data-v="brands">Brands</button>
+    </div>
+    <button class="btn" id="expand">Expand all</button>
+    <button class="btn" id="collapse">Collapse all</button>
+  </div>
+
+  <div class="split" id="split">
+    <section class="card" id="qcard">
+      <div class="chead">
+        <h3>Question tree</h3>
+        <p class="sub">Click a question to see its details. Arrows open or close the questions under it. Grey questions are not searched.</p>
+      </div>
+      <ul class="ol" id="outline"></ul>
+    </section>
+    <aside class="card panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="card" id="bcard" hidden>
+    <div class="chead">
+      <h3>Brands in AI Overviews</h3>
+      <p class="sub">Ranked by the number of questions where the AI Overview names the brand. Select a brand to emphasise it.</p>
+    </div>
+    <div id="brands"></div>
+  </section>
+
+  <div class="foot"><span id="foot"></span></div>
+</div>
+
+<script type="application/json" id="qe-data">
+{"meta":{"seed":"","country":"","language":"","device":"Desktop","date":"","creditsUsed":0,"searchesRun":0,"questionsFound":0,"repeatedSkipped":0},"tree":{"q":"","aio":"absent","paa":[]}}
+</script>
+
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('qe-data').textContent);
+  var META = DATA.meta;
+  var CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function norm(s) { return String(s).trim().toLowerCase(); }
+  function h(tag, props) {
+    var e = document.createElement(tag);
+    props = props || {};
+    Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v);
+    });
+    Array.prototype.slice.call(arguments, 2).forEach(function add(c) {
+      if (c == null || c === false) return;
+      if (Array.isArray(c)) { c.forEach(add); return; }
+      e.append(c);
+    });
+    return e;
+  }
+
+  var uid = 0, ALL = [];
+  function build(raw, level, parent, branch) {
+    var n = typeof raw === 'string' ? { q: raw, analysed: false } : raw;
+    n.id = 'n' + (uid++);
+    n.level = level;
+    n.parent = parent;
+    n.analysed = n.analysed !== false;
+    n.brands = n.brands || [];
+    n.branch = level === 0 ? null : (level === 1 ? n.id : branch);
+    n.open = false;
+    n.detail = false;
+    ALL.push(n);
+    n.kids = (n.paa || []).map(function (c) { return build(c, level + 1, n, n.branch); });
+    return n;
+  }
+  var ROOT = build(DATA.tree, 0, null, null);
+
+  /* default state (fits 1200x675): seed open, first level 1 branch open, nothing selected */
+  ROOT.open = true;
+  ROOT.kids.slice(0, 1).forEach(function (k) { k.open = true; });
+  var SEL = null;
+  var BUBBLE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="2.5" cy="4" r="0.9" fill="currentColor"/><circle cx="2.5" cy="8" r="0.9" fill="currentColor"/><circle cx="2.5" cy="12" r="0.9" fill="currentColor"/></svg>';
+  var CLOSE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+  var bm = {};
+  ALL.forEach(function (n) {
+    n.brands.forEach(function (b) {
+      var k = norm(b);
+      bm[k] = bm[k] || { key: k, name: b, nodes: 0, branches: {} };
+      bm[k].nodes++;
+      if (n.branch) bm[k].branches[n.branch] = 1;
+    });
+  });
+  var BRANDS = Object.keys(bm).map(function (k) { bm[k].nb = Object.keys(bm[k].branches).length; return bm[k]; })
+    .sort(function (a, b) { return b.nodes - a.nodes || b.nb - a.nb || a.name.localeCompare(b.name); });
+  var LV1 = ROOT.kids.length;
+
+  var view = META.view === 'brands' ? 'brands' : 'questions';
+  var selKey = norm(META.highlightBrand || (BRANDS[0] && BRANDS[0].name) || '');
+  var showAll = false;
+
+  document.title = 'Question explorer: ' + META.seed;
+  document.getElementById('seed').textContent = META.seed;
+  var analysed = ALL.filter(function (n) { return n.analysed && n.level < 3; });
+  var aioN = analysed.filter(function (n) { return n.aio === 'present' || n.aio === 'degraded'; }).length;
+  document.getElementById('meta').textContent = [META.country + ', ' + META.language, META.device, META.date, '~' + META.creditsUsed + ' credits used'].join('  ·  ');
+  document.getElementById('stats').textContent = [META.questionsFound + ' questions', META.searchesRun + ' searches run', aioN + ' of ' + analysed.length + ' with an AI Overview', BRANDS.length + ' brands named'].join('  ·  ');
+  document.getElementById('foot').textContent = (META.repeatedSkipped || 0) + ' repeated questions skipped. Approximate credits, one per search.';
+
+  /* brand view */
+  function brandView() {
+    var max = BRANDS.length ? BRANDS[0].nodes : 1;
+    var list = showAll ? BRANDS : BRANDS.slice(0, 10);
+    var el = h('div', {}, h('div', { class: 'rhead' }, h('span'), h('span', { text: 'Brand' }), h('span'), h('span', { class: 'n', text: 'Questions' }), h('span', { class: 'n', text: 'Branches' })));
+    list.forEach(function (b, i) {
+      el.append(h('div', { class: 'rrow' + (b.key === selKey ? ' sel' : ''), onclick: function () { selKey = b.key; render(); } },
+        h('span', { class: 'rk', text: String(i + 1) }),
+        h('span', { class: 'nm', text: b.name }),
+        h('span', { class: 'bar' }, h('i', { style: 'width:' + Math.round(b.nodes / max * 100) + '%' })),
+        h('span', { class: 'n', text: String(b.nodes) }),
+        h('span', { class: 'n', text: b.nb + ' of ' + LV1 })));
+    });
+    if (BRANDS.length > 10) el.append(h('button', { class: 'btn showall', text: showAll ? 'Show top 10' : 'Show all ' + BRANDS.length + ' brands', onclick: function () { showAll = !showAll; render(); } }));
+    return el;
+  }
+
+  /* question view */
+  function list(items, withCount) {
+    if (!items || !items.length) return h('div', { class: 'empty', text: 'None found.' });
+    return h('ul', {}, items.map(function (it) {
+      return h('li', {}, h('span', { text: withCount ? it.q : it }), withCount ? h('span', { class: 'c', text: it.count + 'x' }) : null);
+    }));
+  }
+  function detail(n) {
+    var d = h('div', { class: 'detail' }, h('h4', { text: 'Questions on ranking pages' }), list(n.headingQuestions, true),
+      h('h4', { text: 'Top topics' }),
+      (n.topics && n.topics.length) ? h('p', { text: n.topics.join(', ') }) : h('div', { class: 'empty', text: 'None found.' }));
+    if (n.aio === 'absent') {
+      d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: 'No AI Overview appeared on this SERP.' }));
+    } else {
+      d.append(h('h4', { text: 'Questions in the AI Overview' }), list(n.aioQuestions, false),
+        h('h4', { text: 'Questions in cited sources' }), list(n.citedQuestions, true));
+    }
+    if (n.thruuuUrl) d.append(h('a', { class: 'link', href: n.thruuuUrl, target: '_blank', rel: 'noopener', text: 'Open in thruuu' }));
+    return d;
+  }
+  function panelEl() {
+    var p = document.getElementById('panel'); p.textContent = '';
+    if (!SEL) {
+      var ic = h('div'); ic.innerHTML = BUBBLE.replace(/width="13" height="13"/, 'width="28" height="28"');
+      p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: 'Question details' }), h('p', { class: 'sub', text: 'Questions on ranking pages, topics and AI Overview questions.' }))),
+        h('div', { class: 'pempty' }, ic, h('p', { class: 't', text: 'No question selected' }), h('p', { class: 's', text: 'Click a question in the tree to see the questions asked on its ranking pages.' })));
+      return;
+    }
+    var x = h('button', { class: 'pclose', 'aria-label': 'Close details', onclick: function () { SEL = null; render(); } }); x.innerHTML = CLOSE;
+    p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: SEL.q }), h('p', { class: 'sub', text: 'Level ' + SEL.level + (SEL.level === 0 ? ', seed keyword' : '') })), x), detail(SEL));
+  }
+  function rowEl(n) {
+    var row = h('div', { class: 'row lv' + n.level + (n.analysed ? '' : ' leaf') + (SEL === n ? ' sel' : '') });
+    if (n.kids.length) {
+      var chev = h('button', { class: 'chev' + (n.open ? ' open' : ''), 'aria-label': n.open ? 'Collapse' : 'Expand', onclick: function () { n.open = !n.open; render(); } });
+      chev.innerHTML = CHEVRON;
+      row.append(chev);
+    } else row.append(h('span', { class: 'dot' }));
+    if (n.analysed) {
+      var hq = (n.headingQuestions || []).length;
+      var ind = null;
+      if (hq) { ind = h('span', { class: 'ind', title: hq + ' questions on ranking pages' }, h('span', { text: String(hq) })); ind.insertAdjacentHTML('afterbegin', BUBBLE); }
+      row.append(h('button', { class: 'q btnlike', 'aria-pressed': SEL === n ? 'true' : 'false', onclick: function () { SEL = n; render(); } }, h('span', { text: n.q }), ind));
+    } else row.append(h('span', { class: 'q', text: n.q }));
+    return row;
+  }
+  function liEl(n) {
+    var li = h('li', {}, rowEl(n));
+    if (n.open && n.kids.length) li.append(h('ul', { class: 'ol' }, n.kids.map(liEl)));
+    return li;
+  }
+
+  function setAll(open) { ALL.forEach(function (n) { if (n.kids.length) n.open = open || n.level === 0; }); render(); }
+  document.getElementById('expand').onclick = function () { setAll(true); };
+  document.getElementById('collapse').onclick = function () { setAll(false); };
+  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) {
+    b.onclick = function () { view = b.getAttribute('data-v'); render(); };
+  });
+
+  function render() {
+    Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) { b.className = b.getAttribute('data-v') === view ? 'on' : ''; });
+    var q = view === 'questions';
+    document.getElementById('split').hidden = !q;
+    document.getElementById('split').className = 'split' + (SEL ? ' has-sel' : '');
+    if (q) panelEl();
+    document.getElementById('bcard').hidden = q;
+    document.getElementById('expand').hidden = !q;
+    document.getElementById('collapse').hidden = !q;
+    var ol = document.getElementById('outline'); ol.textContent = '';
+    var bv = document.getElementById('brands'); bv.textContent = '';
+    if (q) ol.append(liEl(ROOT)); else bv.append(brandView());
+  }
+  render();
+})();
+</script>
+</body>
+</html>
