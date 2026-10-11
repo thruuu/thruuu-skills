@@ -4,7 +4,8 @@ This skill is an unpublished admin build. Delete this file and the "Unpublished 
 
 ## Prerequisites
 
-- An admin account with the thruuu MCP server connected in your client. Connection steps are in the MCP server reference.
+- A thruuu account with the thruuu MCP server connected in your client. The MCP server is open to every plan, but the app's MCP page (where keys are created) is still admin-only until the public release, so use an admin account for now. Connection steps are in the MCP server reference.
+- Plan limits apply: on Free the SERP market is fixed to US/English and the topic cluster and AI Overview report offers are not included.
 - The Question Explorer MCP changes (get_serp_analysis with topics, brands in the AI Overview, and `include` related_searches) deployed on the environment you point at.
 
 ## Claude Code
@@ -27,4 +28,4 @@ Pull the branch, then copy the folder again.
 
 ## Not published
 
-The branch is local. Do not push or merge it until MCP opens to Pro and Agency plans.
+The branch is local. Do not push or merge it until the app's MCP page opens to all users (public release).
