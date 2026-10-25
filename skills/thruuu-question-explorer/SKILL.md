@@ -32,7 +32,7 @@ This skill needs the thruuu MCP server connected to your AI assistant. It works 
 
 Call `get_credits` first. It returns the balance (pooled for company plans) and `Plan: <name>.` (Free, Trial, PAYG, Starter Plan, Professional Plan or Agency Plan). Keep both; the plan decides what the rest of the run offers:
 
-| Plan | Market and options | AI Overview questions | Brands | Topic cluster | AI Overview report (keyword cap) |
+| Plan | Market and options | AI Overview data | Brands | Topic cluster | AI Overview report (keyword cap) |
 |---|---|---|---|---|---|
 | Free | fixed | not included | not included | not included | not included |
 | Trial | free choice | included | included | included | included (100) |
