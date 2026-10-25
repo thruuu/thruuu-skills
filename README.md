@@ -13,12 +13,14 @@ Want to build your own agent instead? See [thruuu-claude-content-strategist](htt
 | [`thruuu-data-pull`](skills/thruuu-data-pull/SKILL.md) | Reads your Topic Clusters projects and AI Overview reports through the API. Read-only, never spends credits. Also answers questions about a single keyword: what the AI Overview says, which sources it cites, and the top 10. |
 | [`thruuu-content-strategy`](skills/thruuu-content-strategy/SKILL.md) | Builds the plan: a prioritised list of pages to create or refresh, with the data behind each decision, your visibility in AI Overviews against competitors, and content guidance for each page. Re-run it monthly to see what changed. |
 | [`thruuu-content-pipeline`](skills/thruuu-content-pipeline/SKILL.md) | Sends the pages you choose to the thruuu Content Pipeline (analysis, brief, draft), shows each brief in the chat for approval, saves the finished drafts, and deletes or archives items to free slots. Always shows the credit cost and waits for your yes. |
+| [`thruuu-question-explorer`](skills/thruuu-question-explorer/SKILL.md) | Builds an interactive question tree from a seed keyword: the People Also Asked questions three levels deep, the questions asked on ranking pages, the topics they cover, related searches and, on plans that include them, what Google's AI Overview says and which brands it names. Shown as one HTML page, with a CSV export. Needs the thruuu MCP server, not the API key. Quotes the credit cost (about 21 credits for three levels) and waits for your yes. |
 
 ## What you need
 
 - A thruuu account with API access (Settings > API).
 - A Topic Clusters project and an AI Overview report for the same domain.
 - Python 3 (no packages to install).
+- For `thruuu-question-explorer` only: the thruuu MCP server connected to your assistant ([setup guide](https://thruuu.com/learn/seo-mcp-server/)). It works on every plan.
 
 ## Install
 

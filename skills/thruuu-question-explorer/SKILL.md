@@ -4,11 +4,18 @@ description: Builds an interactive question tree from a seed keyword: the People
 allowed-tools: Bash(python3:*)
 ---
 
-> Unpublished admin build. The thruuu MCP server is open to every plan, but the app's MCP page is still admin-only until the public release. Needs get_serp_analysis with include topics, ai_overview brands and related_searches (deployed). Offers a topic cluster, an AI Overview report and a CSV export at the end, where the plan allows. Remove this line when the skill is published.
-
 # thruuu question explorer
 
 Builds a 3-level People Also Asked tree for a seed keyword and shows it as an interactive page. Every question that is searched is one Google SERP analysis (1 credit).
+
+## Connect and install
+
+This skill needs the thruuu MCP server connected to your AI assistant. It works on every plan.
+
+1. In thruuu, open **API & Bulk Tools > MCP**. The page shows your MCP key and the setup for your assistant. Step-by-step guide: https://thruuu.com/learn/seo-mcp-server/
+2. Claude Code: run the command from the MCP page, then start a new session. claude.ai and the Claude desktop app: **Settings > Connectors > Add custom connector**, name it `thruuu`, paste the connection URL from the MCP page.
+3. Check it: ask "What is my thruuu credit balance?"
+4. Install the skill: copy the `thruuu-question-explorer` folder to where your agent loads skills (for Claude Code, `.claude/skills/`), then ask "build a question explorer for <keyword>".
 
 ## Rules
 
