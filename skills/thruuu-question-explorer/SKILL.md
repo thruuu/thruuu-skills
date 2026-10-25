@@ -100,8 +100,8 @@ Normaliser: lowercase, trim, collapse whitespace, remove trailing `?` and punctu
 
 Build the data JSON (mapping below; `references/sample-data.json` is a complete example), then output by surface:
 
-- **Page** (the default; Claude Code, or any assistant that can run Python): write `qe-data.json` and run `python3 ${CLAUDE_SKILL_DIR}/scripts/render.py qe-data.json question-explorer-<seed-slug>-<YYYYMMDD>.html`. Print the absolute path and offer to open it. Fix any validation error and re-run; do not hand-edit the HTML. The script cleans the lists, builds the Article groups and All questions tabs and writes the plan notes. Tabs: Question tree (default), All questions, Article groups, Brands.
-- **No page** (the user said "no page", or no assistant tool can run Python): run `python3 ${CLAUDE_SKILL_DIR}/scripts/render.py qe-data.json --text` and give the lists in chat, in the user's language around verbatim questions: Article groups, All questions, brands (if the plan includes them). Without Python, apply the rules below by hand.
+- **Page** (the default; Claude Code, or any assistant that can run Python): write the working record to `question-explorer-<seed-slug>-<YYYYMMDD>.json` in the folder where the page goes (never a temp or scratch folder, never a shared `qe-data.json`) and run `python3 ${CLAUDE_SKILL_DIR}/scripts/render.py question-explorer-<seed-slug>-<YYYYMMDD>.json question-explorer-<seed-slug>-<YYYYMMDD>.html`. The `.cleaned.json` lands beside the page. To rebuild a page, look for that `.json` first and re-run render.py on it; no new searches. Print the absolute path and offer to open it. Fix any validation error and re-run; do not hand-edit the HTML. The script cleans the lists, builds the Article groups and All questions tabs and writes the plan notes. Tabs: Question tree (default), All questions, Article groups, Brands.
+- **No page** (the user said "no page", or no assistant tool can run Python): save the same record file and run `python3 ${CLAUDE_SKILL_DIR}/scripts/render.py question-explorer-<seed-slug>-<YYYYMMDD>.json --text` and give the lists in chat, in the user's language around verbatim questions: Article groups, All questions, brands (if the plan includes them). Without Python, apply the rules below by hand.
 - **Flat list on request:** one list of unique questions with level and parent question, no repeats.
 - **Brand click-through:** tell the user to open the Brands tab and click a brand. Setting `meta.highlightBrand` (stored spelling) opens it selected.
 
@@ -117,7 +117,7 @@ Then in chat, two or three lines: questions found, searches run, credits used, a
 
 ### Working record
 
-Keep this per analysed node in context (or append it to `qe-data.json` as each read finishes). It feeds the page, the closing step and the CSV.
+Keep this per analysed node in context (or append it to `question-explorer-<seed-slug>-<YYYYMMDD>.json` as each read finishes). It feeds the page, the closing step and the CSV.
 
 - `q`, `level` (0 seed, 1, 2), `thruuuUrl`, `scrapeLogId`, `urls`, `aio`, `brands`, `citedQuestions`.
 - `paaAll`: every PAA question listed on this node's SERP, in order, repeated ones included. The HTML `paa` still drops repeats (Step 8); `paaAll` does not.
