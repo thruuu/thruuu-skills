@@ -23,7 +23,7 @@ FURNITURE = re.compile(r"^(ready for more|who this (course|guide) is for|what yo
 TAIL = re.compile(r"[\s?!.,;:]+$")
 
 SHARE = 4          # shared top-10 URLs that put a question in a group
-SIMILAR = 0.75     # content-word overlap (Jaccard) that makes two wordings one group
+SIMILAR = 0.8      # content-word overlap (Jaccard) that makes two wordings one group
 STOP = set("a an the is are was were be do does did can could should would will of for to in on at by with and or than vs versus i you we my your me it its this that what which who how why when where about as from into".split())
 # capabilities by plan name (first word, lower case)
 PLAN_RULES = {
