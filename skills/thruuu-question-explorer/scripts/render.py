@@ -438,16 +438,24 @@ def build_all_questions(tree, meta):
         else:
             clusters.append({"tok": t, "keys": [k]})
     out = []
-    for ci, c in enumerate(clusters):
+    for c in clusters:
+        vs = []
         for k in c["keys"]:
             r = rows[k]
-            out.append({"q": r["q"], "n": r["n"], "sources": [SRC_LABEL[s] for s in SRC_ORDER if s in r["src"]], "cluster": ci})
+            vs.append({"q": r["q"], "n": r["n"], "sources": [SRC_LABEL[x] for x in SRC_ORDER if x in r["src"]]})
+        srcs = [l for x, l in ((x, SRC_LABEL[x]) for x in SRC_ORDER) if any(l in v["sources"] for v in vs)]
+        out.append({"q": vs[0]["q"], "n": sum(v["n"] for v in vs), "sources": srcs, "variants": vs[1:]})
+    out.sort(key=lambda g: -g["n"])
     return out
+
+
+def flat_questions(groups):
+    return [{"q": g["q"]} for g in groups] + [{"q": v["q"]} for g in groups for v in g["variants"]]
 
 
 def cluster_prompt(meta, rows):
     cap = meta["clusterCap"]
-    qs = [meta["seed"]] + [r["q"] for r in rows]
+    qs = [meta["seed"]] + [r["q"] for r in flat_questions(rows)]
     cut = qs[:cap] if cap else qs
     return len(qs), len(cut), 'Create a topic cluster from these %d questions about "%s":\n' % (len(cut), meta["seed"]) + "\n".join("- " + q for q in cut)
 
@@ -468,9 +476,11 @@ def text_report(data):
         L.append("   " + g["why"])
         if g["members"][0]["prompt"]:
             L.append("   Brief: " + g["members"][0]["prompt"])
-    L += ["", "# All questions (%d, similar ones together, by count)" % len(data["allQuestions"]), ""]
+    L += ["", "# All questions (%d, similar wordings grouped, by count)" % data["allTotal"], ""]
     for r in data["allQuestions"]:
-        L.append("- %s%s [%s]" % (r["q"], " x%d" % r["n"] if r["n"] > 1 else "", ", ".join(r["sources"])))
+        L.append("- %s x%d [%s]" % (r["q"], r["n"], ", ".join(r["sources"])))
+        for v in r["variants"]:
+            L.append("    - %s x%d" % (v["q"], v["n"]))
     if meta["aioIncluded"] and meta["brandsIncluded"]:
         bm = {}
         for n in each_node(tree):
@@ -548,6 +558,7 @@ def main():
         meta["view"] = "tree"
     data["groups"] = build_groups(tree, meta)
     data["allQuestions"] = build_all_questions(tree, meta)
+    data["allTotal"] = len(flat_questions(data["allQuestions"]))
     total, shown, prompt = cluster_prompt(meta, data["allQuestions"])
     data["cluster"] = {"total": total, "shown": shown, "prompt": prompt}
     data["urlsMissing"] = not any(n.get("urls") for n in each_node(tree))

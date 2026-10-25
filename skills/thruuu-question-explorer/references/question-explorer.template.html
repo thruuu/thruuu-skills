@@ -219,7 +219,9 @@
   .next .hint { font-size: 0.75rem; color: var(--grey); }
   .aq { display: grid; grid-template-columns: minmax(0, 1fr) 52px 210px; column-gap: 14px; align-items: baseline; padding: 6px 22px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; line-height: 1.25rem; }
   .aq.head { height: 30px; align-items: center; background: var(--thead); border-top: 1px solid var(--stroke-l1); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); padding-top: 0; padding-bottom: 0; }
-  .aq.gap { border-top: 6px solid var(--tint); }
+  .aq.var { background: var(--tint); }
+  .aq.var > span:first-child { padding-left: 24px; color: var(--charcoal); }
+  .sim { margin-left: 10px; font: 600 0.75rem 'Manrope', sans-serif; color: var(--link); background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
   .aq .n { text-align: right; font-weight: 700; color: var(--grey); }
   .aq .src { color: var(--grey); font-size: 0.75rem; }
   .qlinks { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
@@ -440,16 +442,19 @@
   if (ROOT.scrapeLogId) document.getElementById('treeNext').append(nextBox('Turn the seed into a brief', 'The seed’s search is already in your thruuu account, so the brief needs no new search. Select another question for its own prompt.', 'Create a brief from the SERP analysis ' + ROOT.scrapeLogId + ' for "' + ROOT.q + '".'));
 
   /* ---------- all questions ---------- */
+  var AQOPEN = {};
   function renderAll() {
     var el = document.getElementById('alist'); el.textContent = '';
-    document.getElementById('aTitle').textContent = 'All questions: ' + AQ.length + ' found';
-    document.getElementById('aSub').textContent = 'Every question from People Also Asked, the headings of ranking pages and the sources an AI Overview cites. Repeats are merged and shown as xN (N = how many searches listed it). Similar wording sits side by side.';
-    document.getElementById('aLegend').textContent = 'Sorted by count. A thin gap separates groups of similar questions.';
+    var total = DATA.allTotal || AQ.length;
+    document.getElementById('aTitle').textContent = 'All questions: ' + total + ' found';
+    document.getElementById('aSub').textContent = 'Every question from People Also Asked, the headings of ranking pages and the sources an AI Overview cites. Repeats are merged and shown as xN (N = how many searches listed it). Similar wordings are grouped under one row: the most common wording, the group\u2019s total count, and a +N similar toggle for the others.';
+    document.getElementById('aLegend').textContent = 'Sorted by count.';
     el.append(h('div', { class: 'aq head' }, h('span', { text: 'Question' }), h('span', { class: 'n', text: 'Count' }), h('span', { text: 'Source' })));
-    var prev = null;
-    AQ.forEach(function (r) {
-      el.append(h('div', { class: 'aq' + (prev !== null && prev !== r.cluster ? ' gap' : '') }, h('span', { text: r.q }), h('span', { class: 'n', text: r.n > 1 ? 'x' + r.n : '' }), h('span', { class: 'src', text: r.sources.join(', ') })));
-      prev = r.cluster;
+    AQ.forEach(function (r, i) {
+      var open = !!AQOPEN[i], nv = r.variants.length;
+      var tog = nv ? h('button', { class: 'sim', 'aria-expanded': open ? 'true' : 'false', text: (open ? '\u2212' : '+') + nv + ' similar', onclick: function () { AQOPEN[i] = !AQOPEN[i]; renderAll(); } }) : null;
+      el.append(h('div', { class: 'aq' }, h('span', {}, h('span', { text: r.q }), tog), h('span', { class: 'n', text: 'x' + r.n }), h('span', { class: 'src', text: r.sources.join(', ') })));
+      if (open) r.variants.forEach(function (v) { el.append(h('div', { class: 'aq var' }, h('span', { text: v.q }), h('span', { class: 'n', text: 'x' + v.n }), h('span', { class: 'src', text: v.sources.join(', ') }))); });
     });
     var nx = document.getElementById('aNext'); nx.textContent = '';
     if (META.clusterIncluded === false) nx.append(h('div', { class: 'notice', text: 'Topic clusters are not included on the ' + PLAN + ' plan.' }));
@@ -566,7 +571,7 @@
     document.title = 'Question explorer: ' + META.seed;
     document.getElementById('seed').textContent = META.seed;
     document.getElementById('meta').textContent = [META.country + ', ' + META.language, META.device, META.date, '~' + META.creditsUsed + ' credits used'].join('  ·  ');
-    var s = [plural(GROUPS.length, 'article group', 'article groups') + ' from ' + plural(META.searchesRun, 'search', 'searches'), plural(META.questionsFound, 'question', 'questions') + ' in the tree', AQ.length + ' in all'];
+    var s = [plural(GROUPS.length, 'article group', 'article groups') + ' from ' + plural(META.searchesRun, 'search', 'searches'), plural(META.questionsFound, 'question', 'questions') + ' in the tree', (DATA.allTotal || AQ.length) + ' in all'];
     if (AIO_ON) s.push(aioN + ' of ' + analysed.length + ' with an AI Overview'); else s.push('AI Overview data is not included on the ' + PLAN + ' plan');
     if (AIO_ON && BRANDS_ON) s.push(OTHERS.length + ' brands named' + (BRANDS.some(function (b) { return b.own; }) ? ' besides ' + BRANDS.filter(function (b) { return b.own; }).map(function (b) { return b.name; }).join(', ') : ''));
     document.getElementById('stats').textContent = s.join('  ·  ');
