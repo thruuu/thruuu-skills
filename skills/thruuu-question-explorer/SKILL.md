@@ -132,7 +132,7 @@ Keep this per analysed node in context. It feeds the HTML data, the closing step
 | node `q` | bullet under `### People Also Asked (On SERP)` | verbatim; the tool escapes the pipe character with a backslash, restore the plain pipe |
 | node `thruuuUrl` | the `Open in thruuu: <url>` line | verbatim, must be `https://` |
 | node `aio` | the `## AI Overview` section | `"absent"` if it says "No AI Overview appeared on this SERP for this query."; `"degraded"` if it starts "Google's AI Overview appeared for this query, but a full source list wasn't captured"; else `"present"`. If the section is missing and a `Not included on your <Plan> plan` line names AI Overview, omit `aio` and leave `aioQuestions`, `citedQuestions` and `brands` empty |
-| node `headingQuestions` | `### Most frequent questions from headings (On Page)`: bullets `- sentence (Nx)` under "From page titles (H1)" and "From page headings (H2/H3)" | `{q, count}`; merge both lists, dedupe by sentence case-insensitively keeping the higher count, sort by count descending, keep the full list in the working record, the first 10 in the HTML data; "No repeated questions were found across page headings." gives `[]` |
+| node `headingQuestions` | `### Most frequent questions from headings (On Page)`: bullets `- sentence (Nx)` under "From page titles (H1)" and "From page headings (H2/H3)" | `{q, count}`; merge both lists, dedupe by sentence case-insensitively keeping the higher count, clean them (Heading question cleanup below), sort by count descending, keep the full list in the working record, the first 10 in the HTML data; "No repeated questions were found across page headings." gives `[]` |
 | node `topics` | `## Top Topics` table, column Topic (up to 15 rows) | drop fragments, stopword pairs and duplicates; keep 5 to 10 in the working record (`topicRows`); never add one. Both empty-state sentences and "Topic data could not be loaded" give `[]` |
 | node `relatedSearches` | the `## Related Searches` bullets (`- title`) | verbatim; ignore the "Showing the top 15 of N related searches." line; "Related searches were not captured for this SERP." and "No related searches appeared on this SERP." give `[]`. The tool escapes the pipe character with a backslash, restore the plain pipe |
 | node `aioQuestions` | the AI Overview text itself | derived by you, not stored by the tool: sentences in the AI Overview text phrased as questions, verbatim, max 5; `[]` if none or no AI Overview |
@@ -140,6 +140,14 @@ Keep this per analysed node in context. It feeds the HTML data, the closing step
 | node `brands` | line `Brands named: A, B, C` | split on `, `, trim, dedupe case-insensitively; "None" or "not available for this response." gives `[]`. If the line says brands are not included on the plan, `[]` and tell the user |
 | node `paa` | unique PAA questions after dedup, in order | analysed child = object; leaf (level 3, not searched, not analysed, ceiling) = plain string |
 | node `analysed` | | omit (default true) for searched nodes; leaves are plain strings |
+
+### Heading question cleanup
+
+Run on the merged `headingQuestions` list, before it goes into the page, the CSV or the keyword set.
+
+1. Strip a leading FAQ marker (`Q.`, `Q:`, `Q10.`, `1.`, `2)`), then merge entries that now match (Step 8 normaliser), summing the counts.
+2. Keep a heading that reads as a question or a search query, with or without `?` ("How to set up Claude for writing", "What is X", "Which X", "Pros of X: what do users like"). Drop first-person or narrative headings ("How I...", "What I liked"), calls to action and page furniture ("Ready for more?", "Who this course is for") and editorial labels ("How We Chose..."). When unsure, keep it. This is light cleanup.
+3. Never reword a kept question beyond the prefix strip. Say in chat how many were dropped.
 
 Things to tell the user when they matter:
 
