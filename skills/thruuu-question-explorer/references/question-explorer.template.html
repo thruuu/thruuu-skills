@@ -1,58 +1,17 @@
 <!DOCTYPE html>
 <!--
-  Variant: B2, light outline. One thing per view.
-  Idea: Questions view is the question tree (text rows, collapsible) plus a right details panel opened by clicking a question. Brand view is only the ranked brand roll-up. Details hold only what is unique to that question (no brands, no PAA list).
-  Row indicator: a grey bulleted-list icon + count (number of on-page questions) at the row end, only on rows that have some. At 760px and below the panel becomes a bottom sheet.
-  Tradeoff vs B: no chips, no badges, no stat cards, no tinted rows. Brand to question highlighting is gone; the two views never mix.
-
-  NOT a thruuu-client Vue component. Standalone page that Claude fills on every run.
+  Question explorer page. NOT a thruuu-client component: a standalone page that scripts/render.py fills.
   Only the JSON block with id="qe-data" changes between runs. HTML, CSS and JS stay fixed.
+  Tabs: Question tree (default), All questions, Article groups, Brands. All text goes in with textContent.
 
-  ============================ DATA CONTRACT ============================
-  Unchanged from variants A and B.
-
-  <script type="application/json" id="qe-data"> holds ONE object:
-
-  {
-    "meta": {
-      "seed":            string   seed keyword, shown verbatim
-      "country":         string   e.g. "United States"
-      "language":        string   e.g. "English"
-      "device":          string   "Desktop" | "Mobile"
-      "date":            string   display date, e.g. "Oct 6, 2026"
-      "creditsUsed":     number   approximate credits spent
-      "searchesRun":     number   SERP analyses started
-      "questionsFound":  number   unique questions drawn (levels 1 to 3)
-      "repeatedSkipped": number   repeated questions skipped (dedup), 0 allowed
-      "view":            "questions" | "brands"   optional, default "questions"
-      "highlightBrand":  string   optional, brand emphasised in Brand view (default: top brand)
-      "aioIncluded":     boolean  optional, default true. false = the plan excludes AI Overview data
-      "plan":            string   plan name, required when aioIncluded is false
-      "headingsDropped": number   set by render.py (headings removed by cleanup), shown in the footer
-      "brandVariants":   object   set by render.py: brand -> [folded variant names]
-      "topicBrands":     [ string ]   set by render.py: brands that match a seed word, listed last
-    },
-    "tree": Node     the seed node (level 0)
-  }
-
-  Node (analysed: seed, level 1, level 2):
-  {
-    "q":                string
-    "analysed":         boolean                     optional, default true. false = muted leaf, no details
-    "note":             string                      optional. NOT DISPLAYED in B2
-    "thruuuUrl":        string                      "Open in thruuu" link target
-    "aio":              "present" | "absent" | "degraded"   used for the summary count and the "no AI Overview" line in details
-    "headingQuestions": [ { "q": string, "count": number } ]
-    "topics":           [ string ]
-    "relatedSearches":  [ string ]
-    "citedQuestions":   [ { "q": string, "count": number } ]
-    "brands":           [ string ]                  NOT shown per question. Only feeds the Brand view roll-up (render.py folds variants).
-    "paa":              [ Node | string ]           children. A plain string = level 3 question, shown muted, not analysed.
-  }
-
-  Derived by the page, never supplied: level, brand roll-up (nodes + level 1 branches), counts.
-  All text is inserted with textContent.
-  ======================================================================
+  Data block: render.py writes it. See references/sample-data.json for the input shape:
+    meta   seed, country, language, device, date, creditsUsed, searchesRun, questionsFound, repeatedSkipped,
+           optional view (tree | all | groups | brands), highlightBrand, plan, aioIncluded, brandsIncluded.
+           Set by render.py: aioIncluded, brandsIncluded, clusterIncluded, reportIncluded, clusterCap,
+           headingsDropped, brandVariants, topicBrands.
+    tree   Node { q, analysed, thruuuUrl, scrapeLogId, aio (present | absent | degraded), urls, headingQuestions,
+           citedQuestions, topics, topicRows, relatedSearches, relatedModifiers, brands, paa [Node | string] }
+    groups, allQuestions, cluster, urlsMissing   derived by render.py
 -->
 <html lang="en">
 <head>
@@ -60,196 +19,290 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Question explorer</title>
 <style>
+
   :root {
-    --primary: #EB8F10;
-    --primary-dark: #CA7B0E;
-    --black: #060A15;
-    --charcoal: #344054;
-    --grey: #60697A;
-    --stroke: #E4E4E7;
-    --stroke-l1: #ECECEE;
-    --disabled: #D6D6D6;
-    --card: #FFFFFF;
-    --page-a: #FFF9F0;
-    --page-b: #F7F7F8;
+    --primary: #EB8F10; --primary-dark: #CA7B0E; --accent-text: #CA7B0E;
+    --black: #060A15; --charcoal: #344054; --grey: #60697A; --input: #99A0AF;
+    --stroke: #E4E4E7; --stroke-l1: #ECECEE; --disabled: #D6D6D6;
+    --card: #FFFFFF; --page-a: #FFF9F0; --page-b: #F7F7F8;
+    --tint: #FCF8F2; --tint-strong: #FFF6EB; --thead: #F9FAFC;
+    --blue: #4F46E5; --blue-l: #EDECFC; --link: #4F46E5; --green: #00A44B;
+    --scrim: rgba(6,10,21,0.35);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --primary-dark: #CA7B0E;
-      --black: #F4F5F7;
-      --charcoal: #C9CEDA;
-      --grey: #9AA2B2;
-      --stroke: #2E3442;
-      --stroke-l1: #262B37;
-      --disabled: #4A5060;
-      --card: #141821;
-      --page-a: #12151D;
-      --page-b: #0C0E14;
+      --accent-text: #F2A63C; --black: #F4F5F7; --charcoal: #C9CEDA; --grey: #9AA2B2; --input: #6F7786;
+      --stroke: #2E3442; --stroke-l1: #262B37; --disabled: #4A5060;
+      --card: #141821; --page-a: #12151D; --page-b: #0C0E14;
+      --tint: #1A1D27; --tint-strong: #2A2113; --thead: #181C26;
+      --blue: #A5B4FC; --blue-l: #23243A; --link: #A5B4FC; --green: #4ADE80;
+      --scrim: rgba(0,0,0,0.55);
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; padding: 0; }
-  body {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 500;
-    color: var(--black);
-    background: linear-gradient(180deg, var(--page-a) 0%, var(--page-b) 55%);
-    min-height: 100vh;
-  }
-  .page { max-width: 1200px; margin: 0 auto; padding: 14px 28px 20px; }
+  body { font-family: 'Manrope', sans-serif; font-weight: 500; color: var(--black); background: linear-gradient(180deg, var(--page-a) 0%, var(--page-b) 55%); min-height: 100vh; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 14px 28px 24px; }
+  a { color: var(--link); }
+  button { font-family: inherit; }
+  button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible, tr:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
   .top { display: flex; align-items: center; justify-content: space-between; height: 36px; }
   .brand { display: flex; align-items: center; gap: 10px; }
   .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font: 700 16px 'Archivo', sans-serif; }
   .word { font-weight: 800; font-size: 1.125rem; }
-  .sep { width: 1px; height: 18px; background: var(--stroke); margin: 0 4px; }
+  .sepv { width: 1px; height: 18px; background: var(--stroke); margin: 0 4px; }
   .surface { color: var(--grey); font-weight: 600; font-size: 0.9375rem; }
   .made { font-size: 0.8125rem; font-weight: 600; color: var(--grey); }
-  .made b { color: var(--primary-dark); font-weight: 800; }
+  .made b { color: var(--accent-text); font-weight: 800; }
 
   .hero { margin: 8px 0 14px; }
   h1 { margin: 0 0 4px; font-size: 1.625rem; line-height: 2.1rem; font-weight: 600; }
-  h1 .seed-em { color: var(--primary); font-weight: 700; }
+  h1 .seed-em { color: var(--accent-text); font-weight: 700; }
   .line { font-size: 0.875rem; line-height: 1.25rem; color: var(--grey); font-weight: 500; }
   .line + .line { margin-top: 2px; color: var(--charcoal); font-weight: 600; }
 
-  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--stroke); border-radius: 0.375rem; background: var(--card); padding: 2px; }
   .seg button { font: 600 0.875rem 'Manrope', sans-serif; color: var(--charcoal); background: transparent; border: 0; border-radius: 0.25rem; padding: 6px 14px; cursor: pointer; }
-  .seg button.on { background: var(--primary); color: #fff; }
-  .btn { font: 600 0.875rem 'Manrope', sans-serif; color: var(--primary-dark); background: transparent; border: 1px solid var(--primary-dark); border-radius: 0.375rem; padding: 6px 14px; cursor: pointer; }
+  .seg button.on { background: var(--tint-strong); color: var(--accent-text); font-weight: 700; }
+  .btn { font: 600 0.875rem 'Manrope', sans-serif; color: var(--accent-text); background: transparent; border: 1px solid var(--accent-text); border-radius: 0.375rem; padding: 6px 14px; cursor: pointer; }
+  .btn.filled { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+  .btn.sm { padding: 4px 10px; font-size: 0.8125rem; }
 
   .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 10px; box-shadow: 0px 10px 30px 0px rgba(228,228,228,0.15); overflow: hidden; margin-bottom: 12px; }
   .card h3 { margin: 0; font-size: 1.125rem; line-height: 1.6rem; font-weight: 600; }
   .card p.sub { margin: 2px 0 0; color: var(--charcoal); font-size: 0.875rem; line-height: 1.25rem; }
   .chead { padding: 12px 22px 10px; }
+  .legend { margin: 6px 0 0; font-size: 0.75rem; line-height: 1.1rem; color: var(--grey); }
 
-  /* question outline: text only */
+  /* shared marks */
+  .aio { display: inline-block; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.02em; color: var(--blue); background: var(--blue-l); border-radius: 0.25rem; padding: 1px 5px; line-height: 1rem; vertical-align: middle; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 0.6875rem; font-weight: 600; color: var(--charcoal); border: 1px solid var(--stroke); border-radius: 0.25rem; padding: 1px 6px; line-height: 1rem; vertical-align: middle; white-space: nowrap; }
+  .muted { color: var(--grey); }
+  .notice { font-size: 0.8125rem; line-height: 1.2rem; color: var(--charcoal); padding: 10px 22px 12px; border-top: 1px solid var(--stroke-l1); }
+
+  /* ===== Article groups (variant C: plan table) ===== */
+  .gnum { display: inline-block; min-width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 6px; background: var(--tint-strong); color: var(--accent-text); font: 700 0.8125rem 'Archivo', sans-serif; }
+  table.plan { width: 100%; border-collapse: collapse; }
+  .plan th { background: var(--thead); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); text-align: left; padding: 0 14px; height: 34px; border-top: 1px solid var(--stroke-l1); border-bottom: 1px solid var(--stroke-l1); white-space: nowrap; }
+  .plan td { padding: 10px 14px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; line-height: 1.25rem; vertical-align: top; }
+  .plan th.n, .plan td.n { text-align: right; }
+  .plan th.first, .plan td.first { padding-left: 22px; width: 24px; }
+  .plan th.last, .plan td.last { padding-right: 22px; text-align: right; white-space: nowrap; }
+  .plan tr.main { cursor: pointer; }
+  .plan tr.main.open td { background: var(--tint); border-bottom: 0; }
+  .plan .lead { font-weight: 600; display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .plan .more { display: block; font-size: 0.75rem; color: var(--grey); margin-top: 2px; line-height: 1.1rem; }
+  .plan td.q { white-space: nowrap; color: var(--charcoal); }
+  .plan tr.x td { padding: 0; background: var(--tint); }
+  .xband { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; padding: 0 22px 14px 60px; }
+  .xband h4 { margin: 10px 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--grey); }
+  .xband ul { list-style: none; margin: 0; padding: 0; }
+  .xband li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.8125rem; line-height: 1.2rem; padding: 2px 0; }
+  .xband li .c { color: var(--grey); font-weight: 600; white-space: nowrap; font-size: 0.75rem; }
+  .xband li.leaf { color: var(--grey); }
+  .xband .gq { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .xband p { margin: 0; font-size: 0.8125rem; line-height: 1.2rem; }
+  .why { color: var(--grey); font-size: 0.75rem; line-height: 1.1rem; margin-top: 8px; }
+  .xband .links { margin-top: 10px; font-size: 0.8125rem; font-weight: 600; }
+  .xband .links a { text-decoration: none; }
+  .x .brief { padding-left: 60px; }
+
+  /* brief hand-off box (shared) */
+  .brief { border-top: 1px solid var(--stroke-l1); background: var(--tint); padding: 12px 22px 16px; }
+  .brief h4 { margin: 0 0 2px; font-size: 0.9375rem; font-weight: 600; }
+  .brief p.s { margin: 0 0 10px; font-size: 0.8125rem; line-height: 1.2rem; color: var(--charcoal); }
+  .brief .pick { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
+  .brief .pick label { display: flex; align-items: baseline; gap: 8px; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; }
+  .brief .pick input { accent-color: var(--primary-dark); margin: 0; position: relative; top: 2px; }
+  .brief .pick .lead { margin-left: 6px; font-size: 0.6875rem; font-weight: 600; color: var(--accent-text); }
+  .brief .step { font-size: 0.75rem; font-weight: 700; color: var(--grey); margin: 8px 0 4px; }
+  .brief textarea { width: 100%; resize: none; font: 500 0.8125rem/1.2rem 'Manrope', sans-serif; color: var(--black); background: var(--card); border: 1px solid var(--stroke); border-radius: 0.375rem; padding: 10px 12px; }
+  .brief .row2 { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  .brief .hint { font-size: 0.75rem; color: var(--grey); }
+
+  /* ===== Question tree (shared) ===== */
   ul.ol { list-style: none; margin: 0; padding: 0; }
-  ul.ol ul.ol { margin-left: 28px; }
+  ul.ol ul.ol { margin-left: 28px; display: none; }
+  li.open > ul.ol { display: block; }
   .row { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 6px 22px 6px 16px; }
   .row.lv0 { padding-top: 8px; padding-bottom: 8px; border-top: 1px solid var(--stroke-l1); }
-  .chev { width: 22px; height: 22px; border: 0; background: none; color: var(--grey); padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .chev { width: 22px; height: 22px; border: 0; background: none; color: var(--grey); padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; }
   .chev svg { transition: transform .15s; }
-  .chev.open svg { transform: rotate(90deg); }
+  li.open > .row .chev svg { transform: rotate(90deg); }
   .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--disabled); margin: 0 auto; }
   .q { font-size: 0.9375rem; line-height: 1.3rem; font-weight: 500; color: var(--black); }
-  .q.btnlike { background: none; border: 0; padding: 3px 8px; margin: -3px -8px; width: calc(100% + 16px); border-radius: 6px; text-align: left; font-family: inherit; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--black); }
-  /* quiet indicator: icon + count, grey, no fill. Only on rows with on-page questions */
-  .ind { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--grey); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
-  .ind svg { display: block; }
+  .q.btnlike { background: none; border: 0; padding: 3px 8px; margin: -3px -8px; width: calc(100% + 16px); border-radius: 6px; text-align: left; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--black); font: inherit; }
+  .q.btnlike .qt { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .kids { flex: none; color: var(--grey); font-size: 0.75rem; font-weight: 700; white-space: nowrap; min-width: 18px; text-align: right; }
+  li.open > .row .kids { visibility: hidden; }
   .lv0 .q { font-size: 1.0625rem; font-weight: 700; }
   .lv1 .q { font-weight: 600; }
   .leaf .q { font-size: 0.875rem; color: var(--grey); }
-  /* selected row: faint neutral tint, bolder text, indicator darkens. No border accent. */
-  .row.sel .q.btnlike { background: rgba(96,105,122,0.10); }
+  .row.sel .q.btnlike { background: var(--tint-strong); }
   .row.sel .q { font-weight: 700; }
-  .row.sel .ind { color: var(--charcoal); }
 
-  /* split: tree left, details panel right */
   .split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
-  .split > .card { margin-bottom: 12px; }
   .panel { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
   .panel .phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 22px 10px; }
   .panel .phead h3 { font-size: 1.0625rem; line-height: 1.5rem; }
-  .panel .phead p.sub { margin-top: 2px; }
   .pclose { flex: none; width: 28px; height: 28px; border: 0; background: none; color: var(--grey); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .pempty { padding: 28px 22px 32px; border-top: 1px solid var(--stroke-l1); text-align: center; }
-  .pempty svg { color: var(--disabled); margin-bottom: 8px; }
   .pempty .t { font-size: 0.9375rem; font-weight: 600; margin: 0 0 4px; }
   .pempty .s { font-size: 0.8125rem; line-height: 1.2rem; color: var(--grey); margin: 0; }
-
-  /* details: no fill, no box, single column inside the panel */
   .detail { padding: 6px 22px 16px; border-top: 1px solid var(--stroke-l1); }
+  .detail h4 { margin: 16px 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--grey); }
   .detail h4:first-child { margin-top: 6px; }
-  .detail h4 { margin: 0 0 4px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--grey); }
-  .detail h4:not(:first-child) { margin-top: 16px; }
   .detail ul { list-style: none; margin: 0; padding: 0; }
-  .detail li { display: flex; justify-content: space-between; gap: 10px; font-size: 0.8125rem; line-height: 1.2rem; font-weight: 400; color: var(--black); padding: 2px 0; }
+  .detail li { display: flex; justify-content: space-between; gap: 10px; font-size: 0.8125rem; line-height: 1.2rem; color: var(--black); padding: 2px 0; }
   .detail li .c { color: var(--grey); font-weight: 600; white-space: nowrap; }
-  .detail p { margin: 0; font-size: 0.8125rem; line-height: 1.2rem; font-weight: 400; color: var(--black); }
-  .empty { font-size: 0.8125rem; color: var(--grey); }
-  .link { display: inline-block; margin-top: 12px; font-size: 0.8125rem; font-weight: 600; color: #4F46E5; text-decoration: none; }
+  .detail p { margin: 0; font-size: 0.8125rem; line-height: 1.2rem; color: var(--black); }
+  .detail p.mods { color: var(--charcoal); margin-bottom: 4px; }
+  .detail .empty { font-size: 0.8125rem; color: var(--grey); }
+  .detail .links { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .detail .links a, .detail .links button { font: 600 0.8125rem 'Manrope', sans-serif; color: var(--link); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; }
+  .scrim { display: none; }
 
-  /* brand roll-up: ranked list only */
-  .rhead, .rrow { display: grid; grid-template-columns: 28px 160px minmax(0, 1fr) 72px 96px; align-items: center; column-gap: 14px; padding: 0 22px; }
-  .rhead { height: 30px; border-top: 1px solid var(--stroke-l1); border-bottom: 1px solid var(--stroke-l1); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); }
+  /* ===== Brands (shared) ===== */
+  .rhead, .rrow { display: grid; grid-template-columns: 28px 170px minmax(0, 1fr) 80px 96px; align-items: center; column-gap: 14px; padding: 0 22px; }
+  .rhead { height: 30px; border-top: 1px solid var(--stroke-l1); border-bottom: 1px solid var(--stroke-l1); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); background: var(--thead); }
   .rhead .n, .rrow .n { text-align: right; }
-  .rrow { height: 34px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; cursor: pointer; }
-  .rrow:last-child { border-bottom: 0; }
+  .rrow { min-height: 36px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; cursor: pointer; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; color: var(--black); }
+  .rrow.own { cursor: default; background: var(--tint); }
   .rk { color: var(--grey); font-weight: 600; font-size: 0.8125rem; }
   .nm { font-weight: 600; }
+  .nm .tag { margin-left: 6px; }
   .bar { height: 5px; border-radius: 3px; background: var(--stroke-l1); }
-  .bar i { display: block; height: 100%; border-radius: 3px; background: var(--disabled); }
+  .bar i { display: block; height: 100%; border-radius: 3px; background: var(--primary); }
+  .rrow.own .bar i { background: var(--disabled); }
   .rrow.sel .nm { font-weight: 800; }
-  .rrow.sel .bar i { background: var(--primary); }
-  .showall { margin: 10px 22px 14px; }
+  .bdetail { padding: 8px 22px 14px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.8125rem; line-height: 1.2rem; }
+  .bdetail h4 { margin: 0 0 4px; font-size: 0.75rem; color: var(--grey); font-weight: 600; }
+  .bdetail ul { margin: 0; padding: 0; list-style: none; }
+  .bdetail li { padding: 1px 0; }
+  .own-note { padding: 8px 22px 14px; font-size: 0.75rem; color: var(--grey); line-height: 1.1rem; }
 
-  .foot { font-size: 0.75rem; color: var(--grey); font-weight: 600; display: flex; justify-content: space-between; gap: 16px; }
+  .foot { font-size: 0.75rem; color: var(--grey); font-weight: 600; margin-top: 4px; }
 
   @media (max-width: 1000px) {
     .split { grid-template-columns: minmax(0, 1fr) 320px; }
-    .rhead, .rrow { grid-template-columns: 24px 110px minmax(0, 1fr) 56px 80px; }
+    .rhead, .rrow { grid-template-columns: 24px 120px minmax(0, 1fr) 60px 80px; }
+    .plan .hm2 { display: none; }
   }
-  /* narrow: panel becomes a bottom sheet, only while a question is selected; tree keeps full width */
   @media (max-width: 760px) {
     .page { padding: 12px 14px 20px; }
     .split { grid-template-columns: minmax(0, 1fr); }
-    .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; max-height: 68vh; border-radius: 14px 14px 0 0; margin: 0; z-index: 10; box-shadow: 0 -10px 30px rgba(0,0,0,0.12); }
+    .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; max-height: 60vh; border-radius: 14px 14px 0 0; margin: 0; z-index: 11; box-shadow: 0 -10px 30px rgba(0,0,0,0.12); }
     .split:not(.has-sel) .panel { display: none; }
-    .split.has-sel #qcard { margin-bottom: 40vh; }
+    .split.has-sel .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: 10; border: 0; padding: 0; }
     ul.ol ul.ol { margin-left: 14px; }
     .row { padding: 6px 12px 6px 8px; column-gap: 4px; }
-    .chead { padding-left: 14px; padding-right: 14px; }
-    .toolbar { flex-wrap: wrap; }
-    .rhead, .rrow { grid-template-columns: 20px 90px minmax(0, 1fr) 48px; padding: 0 12px; }
-    .rhead span:last-child, .rrow span:last-child { display: none; }
+    .chead, .notice, .brief, .own-note, .bdetail { padding-left: 14px; padding-right: 14px; }
+    .plan .hm, .plan .hm2 { display: none; }
+    .plan th.first, .plan td.first { padding-left: 14px; }
+    .plan th.last, .plan td.last { padding-right: 14px; }
+    .plan td { padding: 8px 10px; }
+    .xband { grid-template-columns: minmax(0, 1fr); padding: 0 14px 14px 14px; }
+    .x .brief { padding-left: 14px; }
+    .rhead .bar, .rrow .bar, .rhead span:last-child, .rrow span:last-child { display: none; }
+    .rhead, .rrow { grid-template-columns: 20px minmax(0, 1fr) 44px; padding: 0 12px; }
+  }
+
+  /* next step box + all questions */
+  .next { border-top: 1px solid var(--stroke-l1); background: var(--tint); padding: 12px 22px 16px; }
+  .next h4 { margin: 0 0 2px; font-size: 0.9375rem; font-weight: 600; }
+  .next p.s { margin: 0 0 8px; font-size: 0.8125rem; line-height: 1.2rem; color: var(--charcoal); }
+  .next textarea { width: 100%; resize: vertical; font: 500 0.8125rem/1.2rem 'Manrope', sans-serif; color: var(--black); background: var(--card); border: 1px solid var(--stroke); border-radius: 0.375rem; padding: 10px 12px; }
+  .next .row2 { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  .next .hint { font-size: 0.75rem; color: var(--grey); }
+  .aq { display: grid; grid-template-columns: minmax(0, 1fr) 52px 210px; column-gap: 14px; align-items: baseline; padding: 6px 22px; border-bottom: 1px solid var(--stroke-l1); font-size: 0.875rem; line-height: 1.25rem; }
+  .aq.head { height: 30px; align-items: center; background: var(--thead); border-top: 1px solid var(--stroke-l1); font-size: 0.75rem; font-weight: 700; color: var(--charcoal); padding-top: 0; padding-bottom: 0; }
+  .aq.gap { border-top: 6px solid var(--tint); }
+  .aq .n { text-align: right; font-weight: 700; color: var(--grey); }
+  .aq .src { color: var(--grey); font-size: 0.75rem; }
+  .qlinks { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .qlinks a, .qlinks button { font: 600 0.8125rem 'Manrope', sans-serif; color: var(--link); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; }
+  .bdetail li { display: block; }
+  @media (max-width: 760px) {
+    .aq { grid-template-columns: minmax(0, 1fr) 40px; padding: 6px 14px; }
+    .aq .src { display: none; }
+    .next { padding-left: 14px; padding-right: 14px; }
   }
 </style>
 </head>
 <body>
 <div class="page">
   <header class="top">
-    <div class="brand"><span class="mark">t</span><span class="word">thruuu</span><span class="sep"></span><span class="surface">Question explorer</span></div>
+    <div class="brand"><span class="mark">t</span><span class="word">thruuu</span><span class="sepv"></span><span class="surface">Question explorer</span></div>
     <div class="made">Made with <b>thruuu</b></div>
   </header>
 
   <section class="hero">
-    <h1>Question tree for <span class="seed-em" id="seed"></span></h1>
+    <h1>Question explorer for <span class="seed-em" id="seed"></span></h1>
     <div class="line" id="meta"></div>
     <div class="line" id="stats"></div>
   </section>
 
   <div class="toolbar">
-    <div class="seg" id="seg">
-      <button data-v="questions">Questions</button>
-      <button data-v="brands" id="brandsbtn">Brands</button>
+    <div class="seg" id="seg" role="tablist">
+      <button data-v="tree" role="tab">Question tree</button>
+      <button data-v="all" role="tab">All questions</button>
+      <button data-v="groups" role="tab">Article groups</button>
+      <button data-v="brands" role="tab">Brands</button>
     </div>
     <button class="btn" id="expand">Expand all</button>
     <button class="btn" id="collapse">Collapse all</button>
   </div>
 
   <div class="split" id="split">
-    <section class="card" id="qcard">
-      <div class="chead">
-        <h3>Question tree</h3>
-        <p class="sub">Click a question to see its details. Arrows open or close the questions under it. Grey questions are not searched.</p>
-      </div>
-      <ul class="ol" id="outline"></ul>
-    </section>
-    <aside class="card panel" id="panel" aria-live="polite"></aside>
+    <div>
+      <section class="card" id="qcard">
+        <div class="chead">
+          <h3>Question tree</h3>
+          <p class="sub">Click a question to see its details. Arrows open or close the questions under it.</p>
+          <p class="legend" id="treeLegend"></p>
+        </div>
+        <ul class="ol" id="outline" role="tree"></ul>
+        <div id="treeNext"></div>
+      </section>
+    </div>
+    <button class="scrim" id="scrim" aria-label="Close details" tabindex="-1"></button>
+    <aside class="card panel" id="panel" role="region" aria-label="Question details"></aside>
   </div>
+
+  <section class="card" id="acard" hidden>
+    <div class="chead">
+      <h3 id="aTitle">All questions</h3>
+      <p class="sub" id="aSub"></p>
+      <p class="legend" id="aLegend"></p>
+    </div>
+    <div id="alist"></div>
+    <div id="aNext"></div>
+  </section>
+
+  <section class="card" id="gcard" hidden>
+    <div class="chead">
+      <h3 id="gTitle">Article groups</h3>
+      <p class="sub" id="gSub"></p>
+      <p class="legend" id="gLegend"></p>
+    </div>
+    <div id="gnotice" hidden class="notice"></div>
+    <table class="plan" id="plan"></table>
+    <div id="gNext"></div>
+  </section>
 
   <section class="card" id="bcard" hidden>
     <div class="chead">
-      <h3>Brands in AI Overviews</h3>
-      <p class="sub">Ranked by the number of questions where the AI Overview names the brand. Versions of a brand are counted under the main brand (Claude Opus 5.5 under Claude), file names and groups are left out, and a brand that is also your topic is listed last. Select a brand to emphasise it.</p>
+      <h3 id="bTitle">Brands the AI Overview names</h3>
+      <p class="sub" id="bSub"></p>
     </div>
     <div id="brands"></div>
+    <div id="bNext"></div>
   </section>
 
-  <div class="foot"><span id="foot"></span></div>
+  <div class="foot" id="foot"></div>
 </div>
 
 <script type="application/json" id="qe-data">
@@ -260,174 +313,279 @@
 (function () {
   var DATA = JSON.parse(document.getElementById('qe-data').textContent);
   var META = DATA.meta;
-  var CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var AIO_ON = META.aioIncluded !== false, BRANDS_ON = META.brandsIncluded !== false && AIO_ON;
+  var PLAN = META.plan || 'current';
+  var CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var CLOSE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
-  function norm(s) { return String(s).trim().toLowerCase(); }
+  function norm(s) { return String(s).toLowerCase().replace(/\s+/g, ' ').trim().replace(/[\s?!.,;:]+$/, ''); }
   function h(tag, props) {
-    var e = document.createElement(tag);
-    props = props || {};
+    var e = document.createElement(tag); props = props || {};
     Object.keys(props).forEach(function (k) {
-      var v = props[k];
-      if (k === 'class') e.className = v;
-      else if (k === 'text') e.textContent = v;
-      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), v);
-      else e.setAttribute(k, v);
+      var v = props[k]; if (v == null || v === false) return;
+      if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v;
+      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
     });
-    Array.prototype.slice.call(arguments, 2).forEach(function add(c) {
-      if (c == null || c === false) return;
-      if (Array.isArray(c)) { c.forEach(add); return; }
-      e.append(c);
-    });
+    Array.prototype.slice.call(arguments, 2).forEach(function add(c) { if (c == null || c === false) return; if (Array.isArray(c)) { c.forEach(add); return; } e.append(c); });
     return e;
+  }
+  function isAio(n) { return n.aio === 'present' || n.aio === 'degraded'; }
+  function aioMark() { return h('span', { class: 'aio', text: 'AIO', title: 'Google showed an AI Overview for this question' }); }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  function copyText(txt, btn) {
+    function done() { var t = btn.textContent; btn.textContent = 'Copied'; btn.classList.add('filled'); setTimeout(function () { btn.textContent = t; btn.classList.remove('filled'); }, 1800); }
+    function fallback() { var ta = h('textarea', { style: 'position:fixed;opacity:0' }); ta.value = txt; document.body.append(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
+  }
+  /* next step box: a copyable prompt that leads to another thruuu action */
+  function nextBox(title, sub, prompt, hint) {
+    var ta = h('textarea', { rows: String(Math.min(8, prompt.split('\n').length + 1)), readonly: 'readonly', 'aria-label': title });
+    ta.value = prompt;
+    var copy = h('button', { class: 'btn sm', text: 'Copy prompt', onclick: function () { copyText(ta.value, copy); } });
+    return h('div', { class: 'next' }, h('h4', { text: title }), h('p', { class: 's', text: sub }), ta, h('div', { class: 'row2' }, copy, hint ? h('span', { class: 'hint', text: hint }) : null));
   }
 
   var uid = 0, ALL = [];
   function build(raw, level, parent, branch) {
     var n = typeof raw === 'string' ? { q: raw, analysed: false } : raw;
-    n.id = 'n' + (uid++);
-    n.level = level;
-    n.parent = parent;
-    n.analysed = n.analysed !== false;
-    n.brands = n.brands || [];
+    n.id = 'n' + (uid++); n.level = level; n.parent = parent; n.analysed = n.analysed !== false; n.brands = n.brands || [];
     n.branch = level === 0 ? null : (level === 1 ? n.id : branch);
-    n.open = false;
-    n.detail = false;
+    n.hq = n.headingQuestions || []; n.cq = n.citedQuestions || [];
     ALL.push(n);
     n.kids = (n.paa || []).map(function (c) { return build(c, level + 1, n, n.branch); });
     return n;
   }
   var ROOT = build(DATA.tree, 0, null, null);
-
-  /* default state (fits 1200x675): seed open, first level 1 branch open, nothing selected */
-  ROOT.open = true;
-  ROOT.kids.slice(0, 1).forEach(function (k) { k.open = true; });
-  var SEL = null;
-  var BUBBLE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="2.5" cy="4" r="0.9" fill="currentColor"/><circle cx="2.5" cy="8" r="0.9" fill="currentColor"/><circle cx="2.5" cy="12" r="0.9" fill="currentColor"/></svg>';
-  var CLOSE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-
-  var bm = {};
-  ALL.forEach(function (n) {
-    n.brands.forEach(function (b) {
-      var k = norm(b);
-      bm[k] = bm[k] || { key: k, name: b, nodes: 0, branches: {} };
-      bm[k].nodes++;
-      if (n.branch) bm[k].branches[n.branch] = 1;
-    });
-  });
-  var TOPICB = (META.topicBrands || []).map(norm);
-  var VARS = {};
-  Object.keys(META.brandVariants || {}).forEach(function (k) { VARS[norm(k)] = META.brandVariants[k]; });
-  var AIO_ON = META.aioIncluded !== false;
-  var NOAIO = 'AI Overview data is not included on the ' + (META.plan || 'current') + ' plan';
-  var BRANDS = Object.keys(bm).map(function (k) { bm[k].nb = Object.keys(bm[k].branches).length; bm[k].topic = TOPICB.indexOf(k) >= 0; return bm[k]; })
-    .sort(function (a, b) { return (a.topic - b.topic) || b.nodes - a.nodes || b.nb - a.nb || a.name.localeCompare(b.name); });
+  var analysed = ALL.filter(function (n) { return n.analysed; });
+  var aioN = analysed.filter(isAio).length;
   var LV1 = ROOT.kids.length;
+  var GROUPS = DATA.groups || [];
+  var AQ = DATA.allQuestions || [];
+  var byGroup = {}; GROUPS.forEach(function (g) { byGroup[g.num] = g; });
 
-  var view = META.view === 'brands' && AIO_ON ? 'brands' : 'questions';
-  var selKey = norm(META.highlightBrand || (BRANDS[0] && BRANDS[0].name) || '');
-  var showAll = false;
-
-  document.title = 'Question explorer: ' + META.seed;
-  document.getElementById('seed').textContent = META.seed;
-  var analysed = ALL.filter(function (n) { return n.analysed && n.level < 3; });
-  var aioN = analysed.filter(function (n) { return n.aio === 'present' || n.aio === 'degraded'; }).length;
-  document.getElementById('meta').textContent = [META.country + ', ' + META.language, META.device, META.date, '~' + META.creditsUsed + ' credits used'].join('  ·  ');
-  var statParts = [META.questionsFound + ' questions', META.searchesRun + ' searches run'];
-  if (AIO_ON) statParts.push(aioN + ' of ' + analysed.length + ' with an AI Overview', BRANDS.length + ' brands named');
-  else { statParts.push(NOAIO); document.getElementById('brandsbtn').hidden = true; }
-  document.getElementById('stats').textContent = statParts.join('  ·  ');
-  document.getElementById('foot').textContent = (META.repeatedSkipped || 0) + ' repeated questions skipped. ' + (META.headingsDropped || 0) + ' page headings dropped (first-person, page furniture). Approximate credits, one per search.';
-
-  /* brand view */
-  function brandView() {
-    var max = BRANDS.length ? BRANDS[0].nodes : 1;
-    var list = showAll ? BRANDS : BRANDS.slice(0, 10);
-    var el = h('div', {}, h('div', { class: 'rhead' }, h('span'), h('span', { text: 'Brand' }), h('span'), h('span', { class: 'n', text: 'Questions' }), h('span', { class: 'n', text: 'Branches' })));
-    list.forEach(function (b, i) {
-      el.append(h('div', { class: 'rrow' + (b.key === selKey ? ' sel' : ''), onclick: function () { selKey = b.key; render(); } },
-        h('span', { class: 'rk', text: String(i + 1) }),
-        h('span', { class: 'nm', title: VARS[b.key] ? 'Includes: ' + VARS[b.key].join(', ') : '', text: b.name + (b.topic ? ' (your topic)' : '') + (VARS[b.key] ? ', incl. ' + VARS[b.key].length + ' variants' : '') }),
-        h('span', { class: 'bar' }, h('i', { style: 'width:' + Math.round(b.nodes / max * 100) + '%' })),
-        h('span', { class: 'n', text: String(b.nodes) }),
-        h('span', { class: 'n', text: b.nb + ' of ' + LV1 })));
-    });
-    if (BRANDS.length > 10) el.append(h('button', { class: 'btn showall', text: showAll ? 'Show top 10' : 'Show all ' + BRANDS.length + ' brands', onclick: function () { showAll = !showAll; render(); } }));
-    return el;
-  }
-
-  /* question view */
-  function list(items, withCount) {
-    if (!items || !items.length) return h('div', { class: 'empty', text: 'None found.' });
-    return h('ul', {}, items.map(function (it) {
-      return h('li', {}, h('span', { text: withCount ? it.q : it }), withCount ? h('span', { class: 'c', text: it.count + 'x' }) : null);
-    }));
-  }
-  function detail(n) {
-    var d = h('div', { class: 'detail' }, h('h4', { text: 'Questions on ranking pages' }), list(n.headingQuestions, true),
-      h('h4', { text: 'Top topics' }),
-      (n.topics && n.topics.length) ? h('p', { text: n.topics.join(', ') }) : h('div', { class: 'empty', text: 'None found.' }),
-      h('h4', { text: 'Related searches' }), list(n.relatedSearches, false));
-    if (!AIO_ON) {
-      d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: NOAIO }));
-    } else if (n.aio === 'absent') {
-      d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: 'No AI Overview appeared on this SERP.' }));
-    } else if (n.aio) {
-      d.append(h('h4', { text: 'Questions in cited sources' }), list(n.citedQuestions, true));
-    }
-    if (n.thruuuUrl) d.append(h('a', { class: 'link', href: n.thruuuUrl, target: '_blank', rel: 'noopener', text: 'Open in thruuu' }));
-    return d;
-  }
-  function panelEl() {
-    var p = document.getElementById('panel'); p.textContent = '';
-    if (!SEL) {
-      var ic = h('div'); ic.innerHTML = BUBBLE.replace(/width="13" height="13"/, 'width="28" height="28"');
-      p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: 'Question details' }), h('p', { class: 'sub', text: 'Questions on ranking pages, topics and related searches.' }))),
-        h('div', { class: 'pempty' }, ic, h('p', { class: 't', text: 'No question selected' }), h('p', { class: 's', text: 'Click a question in the tree to see the questions asked on its ranking pages.' })));
-      return;
-    }
-    var x = h('button', { class: 'pclose', 'aria-label': 'Close details', onclick: function () { SEL = null; render(); } }); x.innerHTML = CLOSE;
-    p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: SEL.q }), h('p', { class: 'sub', text: 'Level ' + SEL.level + (SEL.level === 0 ? ', seed keyword' : '') })), x), detail(SEL));
-  }
+  /* ---------- tree ---------- */
+  var SEL = null, LI = {};
+  function countDesc(n) { return n.kids.reduce(function (s, k) { return s + 1 + countDesc(k); }, 0); }
   function rowEl(n) {
-    var row = h('div', { class: 'row lv' + n.level + (n.analysed ? '' : ' leaf') + (SEL === n ? ' sel' : '') });
+    var row = h('div', { class: 'row lv' + n.level + (n.analysed ? '' : ' leaf') });
     if (n.kids.length) {
-      var chev = h('button', { class: 'chev' + (n.open ? ' open' : ''), 'aria-label': n.open ? 'Collapse' : 'Expand', onclick: function () { n.open = !n.open; render(); } });
-      chev.innerHTML = CHEVRON;
-      row.append(chev);
+      var chev = h('button', { class: 'chev', 'aria-label': 'Toggle questions under: ' + n.q, 'aria-expanded': n.level === 0 ? 'true' : 'false', onclick: function () { toggle(n); } });
+      chev.innerHTML = CHEVRON; row.append(chev);
     } else row.append(h('span', { class: 'dot' }));
     if (n.analysed) {
-      var hq = (n.headingQuestions || []).length;
-      var ind = null;
-      if (hq) { ind = h('span', { class: 'ind', title: hq + ' questions on ranking pages' }, h('span', { text: String(hq) })); ind.insertAdjacentHTML('afterbegin', BUBBLE); }
-      row.append(h('button', { class: 'q btnlike', 'aria-pressed': SEL === n ? 'true' : 'false', onclick: function () { SEL = n; render(); } }, h('span', { text: n.q }), ind));
+      var desc = countDesc(n);
+      row.append(h('button', { class: 'q btnlike', 'aria-pressed': 'false', onclick: function () { select(n); } },
+        h('span', { class: 'qt' }, h('span', { text: n.q }), isAio(n) && AIO_ON ? aioMark() : null),
+        n.kids.length ? h('span', { class: 'kids', text: String(desc), title: desc + ' questions under it' }) : null));
     } else row.append(h('span', { class: 'q', text: n.q }));
     return row;
   }
   function liEl(n) {
-    var li = h('li', {}, rowEl(n));
-    if (n.open && n.kids.length) li.append(h('ul', { class: 'ol' }, n.kids.map(liEl)));
-    return li;
+    var li = h('li', { role: 'treeitem', class: n.level === 0 ? 'open' : '' }, rowEl(n));
+    if (n.kids.length) { li.setAttribute('aria-expanded', n.level === 0 ? 'true' : 'false'); li.append(h('ul', { class: 'ol', role: 'group' }, n.kids.map(liEl))); }
+    LI[n.id] = li; return li;
   }
-
-  function setAll(open) { ALL.forEach(function (n) { if (n.kids.length) n.open = open || n.level === 0; }); render(); }
+  function toggle(n, force) {
+    var li = LI[n.id]; var open = typeof force === 'boolean' ? force : !li.classList.contains('open');
+    li.classList.toggle('open', open); li.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var c = li.querySelector(':scope > .row .chev'); if (c) c.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function setAll(open) { ALL.forEach(function (n) { if (n.kids.length) toggle(n, open || n.level === 0); }); }
+  function select(n) {
+    if (SEL) { var o = LI[SEL.id].querySelector(':scope > .row'); o.classList.remove('sel'); o.querySelector('.btnlike').setAttribute('aria-pressed', 'false'); }
+    SEL = n;
+    if (n) { var r = LI[n.id].querySelector(':scope > .row'); r.classList.add('sel'); r.querySelector('.btnlike').setAttribute('aria-pressed', 'true'); }
+    document.getElementById('split').className = 'split' + (SEL ? ' has-sel' : '');
+    panelEl();
+    if (n && window.innerWidth <= 760) LI[n.id].querySelector(':scope > .row').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  function closePanel() { var was = SEL; select(null); if (was) LI[was.id].querySelector('.btnlike').focus(); }
+  function list(items, fmt) { return h('ul', {}, items.map(function (it) { return h('li', {}, h('span', { text: it.q || it }), fmt ? h('span', { class: 'c', text: fmt(it) }) : null); })); }
+  function detail(n) {
+    var d = h('div', { class: 'detail' });
+    d.append(h('h4', { text: 'Questions on ranking pages' }), n.hq.length ? list(n.hq.slice(0, 10), function (it) { return it.count + ' pages'; }) : h('div', { class: 'empty', text: 'No question repeats across the ranking pages.' }));
+    var rows = n.topicRows && n.topicRows.length ? n.topicRows : (n.topics || []).map(function (t) { return { term: t }; });
+    d.append(h('h4', { text: 'Topics' }), rows.length ? h('p', { text: rows.map(function (t) { return t.term + (t.foundOn ? ' (' + t.foundOn + ')' : ''); }).join(', ') }) : h('div', { class: 'empty', text: 'Only the seed’s own words.' }));
+    d.append(h('h4', { text: 'Related searches' }));
+    var mods = n.relatedModifiers || [], rest = n.relatedSearches || [];
+    if (mods.length) d.append(h('p', { class: 'mods', text: 'Modifiers people add: ' + mods.join(', ') }));
+    if (rest.length) d.append(list(rest)); else if (!mods.length) d.append(h('div', { class: 'empty', text: 'None captured for this search.' }));
+    d.append(h('h4', { text: 'AI Overview' }));
+    if (!AIO_ON) d.append(h('p', { class: 'muted', text: 'AI Overview data is not included on the ' + PLAN + ' plan.' }));
+    else if (!isAio(n)) d.append(h('p', { class: 'muted', text: 'No AI Overview appeared for this question.' }));
+    else {
+      d.append(h('p', { text: 'Google answered this question with an AI Overview.' }));
+      if (n.cq.length) d.append(h('h4', { text: 'Questions in its cited sources' }), list(n.cq.slice(0, 10), function (it) { return it.count + ' sources'; }));
+    }
+    var links = h('div', { class: 'qlinks' });
+    var g = byGroup[n.group];
+    if (g) links.append(h('button', { text: 'Article ' + g.num + ': ' + (g.lead === n.q ? 'this is the lead question' : 'same results as "' + g.lead + '"'), onclick: function () { setView('groups'); var el = document.getElementById('g' + g.num); if (el) { if (!el.classList.contains('open')) el.click(); el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } }));
+    if (n.scrapeLogId) { var cb = h('button', { text: 'Copy brief prompt' }); cb.onclick = function () { copyText('Create a brief from the SERP analysis ' + n.scrapeLogId + ' for "' + n.q + '".', cb); }; links.append(cb); }
+    if (n.thruuuUrl && n.thruuuUrl.indexOf('https://') === 0) links.append(h('a', { href: n.thruuuUrl, target: '_blank', rel: 'noopener', text: 'Open in thruuu' }));
+    d.append(links);
+    return d;
+  }
+  function panelEl() {
+    var p = document.getElementById('panel'); p.textContent = '';
+    if (!SEL) { p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: 'Question details' }), h('p', { class: 'sub', text: 'Ranking page questions, topics, related searches and the AI Overview.' }))), h('div', { class: 'pempty' }, h('p', { class: 't', text: 'No question selected' }), h('p', { class: 's', text: 'Click a question in the tree.' }))); return; }
+    var x = h('button', { class: 'pclose', 'aria-label': 'Close details', onclick: closePanel }); x.innerHTML = CLOSE;
+    p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', {}, h('span', { text: SEL.q + ' ' }), isAio(SEL) && AIO_ON ? aioMark() : null), h('p', { class: 'sub', text: SEL.level === 0 ? 'Seed keyword' : 'Under: ' + SEL.parent.q })), x), detail(SEL));
+  }
+  document.getElementById('outline').append(liEl(ROOT));
+  ROOT.kids.slice(0, 1).forEach(function (k) { toggle(k, true); });
+  document.getElementById('scrim').onclick = closePanel;
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && SEL) closePanel(); });
   document.getElementById('expand').onclick = function () { setAll(true); };
   document.getElementById('collapse').onclick = function () { setAll(false); };
-  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) {
-    b.onclick = function () { view = b.getAttribute('data-v'); render(); };
-  });
+  if (ROOT.scrapeLogId) document.getElementById('treeNext').append(nextBox('Turn the seed into a brief', 'The seed’s search is already in your thruuu account, so the brief needs no new search. Select another question for its own prompt.', 'Create a brief from the SERP analysis ' + ROOT.scrapeLogId + ' for "' + ROOT.q + '".'));
 
+  /* ---------- all questions ---------- */
+  function renderAll() {
+    var el = document.getElementById('alist'); el.textContent = '';
+    document.getElementById('aTitle').textContent = 'All questions: ' + AQ.length + ' found';
+    document.getElementById('aSub').textContent = 'Every question from People Also Asked, the headings of ranking pages and the sources an AI Overview cites. Repeats are merged and shown as xN (N = how many searches listed it). Similar wording sits side by side.';
+    document.getElementById('aLegend').textContent = 'Sorted by count. A thin gap separates groups of similar questions.';
+    el.append(h('div', { class: 'aq head' }, h('span', { text: 'Question' }), h('span', { class: 'n', text: 'Count' }), h('span', { text: 'Source' })));
+    var prev = null;
+    AQ.forEach(function (r) {
+      el.append(h('div', { class: 'aq' + (prev !== null && prev !== r.cluster ? ' gap' : '') }, h('span', { text: r.q }), h('span', { class: 'n', text: r.n > 1 ? 'x' + r.n : '' }), h('span', { class: 'src', text: r.sources.join(', ') })));
+      prev = r.cluster;
+    });
+    var nx = document.getElementById('aNext'); nx.textContent = '';
+    if (META.clusterIncluded === false) nx.append(h('div', { class: 'notice', text: 'Topic clusters are not included on the ' + PLAN + ' plan.' }));
+    else {
+      var C = DATA.cluster;
+      nx.append(nextBox('Cluster all of them', 'Turn this list into a topic cluster: thruuu groups the questions by the pages that rank for them and shows which ones one article can answer.', C.prompt,
+        C.shown < C.total ? 'The first ' + C.shown + ' of ' + C.total + ' questions fit one topic cluster on your plan.' : 'Your assistant quotes the cost before it starts.'));
+    }
+  }
+
+  /* ---------- article groups ---------- */
+  var OPEN = {};
+  function renderGroups() {
+    var searched = analysed.length;
+    document.getElementById('gTitle').textContent = 'Content plan: ' + plural(GROUPS.length, 'article', 'articles') + ' from ' + plural(searched, 'search', 'searches');
+    document.getElementById('gSub').textContent = DATA.urlsMissing ? 'Result URLs were not captured, so every searched question stands alone.' : 'A question joins an article when its Google results share 4 or more of the top 10 URLs with the article’s lead question. The lead question is the title, the others become H2s.';
+    document.getElementById('gLegend').textContent = 'Click a row for its questions, H2 candidates, topics and the brief prompt. Questions counts the searched ones and the ones only found. ' + (AIO_ON ? 'AIO: Google answered with an AI Overview. ' : '') + 'Intent is read from the lead question’s first words.';
+    var notice = document.getElementById('gnotice'); notice.hidden = AIO_ON; if (!AIO_ON) notice.textContent = 'AI Overview data is not included on the ' + PLAN + ' plan.';
+    var t = document.getElementById('plan'); t.textContent = '';
+    t.append(h('thead', {}, h('tr', {}, h('th', { class: 'first', text: '#' }), h('th', { text: 'Article' }), h('th', { class: 'n hm', text: 'Questions' }), h('th', { class: 'n hm', text: 'Searches' }), AIO_ON ? h('th', { class: 'hm', text: 'AI Overview' }) : null, h('th', { class: 'hm2', text: 'Intent' }), h('th', { class: 'last', text: 'Brief' }))));
+    var body = h('tbody');
+    GROUPS.forEach(function (g) {
+      var open = !!OPEN[g.num], nQ = g.members.length + g.leaves.length;
+      function flip() { OPEN[g.num] = !OPEN[g.num]; renderGroups(); var r = document.getElementById('g' + g.num); if (r) r.focus({ preventScroll: true }); }
+      var tr = h('tr', { class: 'main' + (open ? ' open' : ''), tabindex: '0', 'aria-expanded': open ? 'true' : 'false', id: 'g' + g.num,
+        onclick: function (e) { if (e.target.closest('button, a')) return; flip(); },
+        onkeydown: function (e) { if (e.target !== tr) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } } });
+      var more = g.members.length > 1 ? plural(g.members.length - 1, 'more search lands', 'more searches land') + ' on the same results' + (g.leaves.length ? ', ' + g.leaves.length + ' asked but not searched' : '') : (g.leaves.length ? g.leaves.length + ' asked in other words, not searched' : '');
+      var aioCell = !g.aioCount ? h('span', { class: 'muted', text: 'none' }) : h('span', {}, aioMark(), ' ', h('span', { text: g.members.length > 1 ? g.aioCount + ' of ' + g.members.length : 'shown' }));
+      [h('td', { class: 'first' }, h('span', { class: 'gnum', text: String(g.num) })),
+        h('td', {}, h('span', { class: 'lead', text: g.lead }), more ? h('span', { class: 'more', text: more }) : null),
+        h('td', { class: 'n hm', text: String(nQ) }), h('td', { class: 'n hm', text: String(g.members.length) }),
+        AIO_ON ? h('td', { class: 'hm' }, aioCell) : null,
+        h('td', { class: 'hm2 q', text: g.intent }),
+        h('td', { class: 'last' }, h('button', { class: 'btn sm', text: 'Brief', 'aria-label': 'Brief prompt for article ' + g.num, onclick: function () { if (!OPEN[g.num]) { OPEN[g.num] = true; renderGroups(); } var r = document.getElementById('x' + g.num); if (r) r.querySelector('input, textarea').focus(); } }))].filter(Boolean).forEach(function (c) { tr.append(c); });
+      body.append(tr);
+      if (open) {
+        var shown = g.showAll ? g.h2 : g.h2.slice(0, 6);
+        var band = h('div', { class: 'xband' },
+          h('div', {}, h('h4', { text: 'Questions this article answers (' + nQ + ')' }),
+            h('ul', {}, g.members.map(function (m, i) { return h('li', {}, h('span', { class: 'gq' }, h('span', { text: m.q }), m.aio && AIO_ON && m.aio !== 'absent' ? aioMark() : null), h('span', { class: 'c', text: i === 0 ? 'lead' : m.shared + ' shared' })); }),
+              g.leaves.map(function (q) { return h('li', { class: 'leaf' }, h('span', { text: q }), h('span', { class: 'c', text: 'not searched' })); })),
+            h('p', { class: 'why', text: g.why })),
+          h('div', {}, h('h4', { text: 'H2 candidates (' + g.h2.length + ')' }),
+            g.h2.length ? h('ul', {}, shown.map(function (it) { return h('li', {}, h('span', { text: it.q }), h('span', { class: 'c', text: it.src === 'aio' ? (it.count > 1 ? it.count + ' AI Overview sources' : 'AI Overview source') : it.count + ' pages' })); })) : h('p', { class: 'muted', text: 'No question repeats across the ranking pages.' }),
+            g.h2.length > 6 ? h('button', { class: 'btn sm', style: 'margin-top:6px', text: g.showAll ? 'Show top 6' : 'Show all ' + g.h2.length, onclick: function () { g.showAll = !g.showAll; renderGroups(); } }) : null,
+            h('h4', { text: 'Topics on the ranking pages' }),
+            g.topics.length ? h('p', { text: g.topics.map(function (x) { return x.term + (x.label ? ' (' + x.label + ')' : ''); }).join(', ') }) : h('p', { class: 'muted', text: 'Only the seed’s own words.' })));
+        body.append(h('tr', { class: 'x', id: 'x' + g.num }, h('td', { colspan: AIO_ON ? '7' : '6' }, band, briefBox(g))));
+      }
+    });
+    t.append(body);
+    var nx = document.getElementById('gNext'); nx.textContent = '';
+    var ids = [], names = [];
+    GROUPS.forEach(function (g) { if (g.members[0].scrapeLogId) { ids.push(g.members[0].scrapeLogId); names.push(g.lead); } });
+    if (ids.length) nx.append(nextBox('Check the real search intent', 'The Intent column is a guess from the first words. Run the search intent analysis on the lead questions’ searches to see what Google actually rewards.', 'Run search intent on the SERP analyses ' + ids.join(', ') + ' (' + names.map(function (q) { return '"' + q + '"'; }).join(', ') + ').'));
+  }
+  function briefBox(g) {
+    var box = h('div', { class: 'brief' });
+    var pickable = g.members.filter(function (m) { return m.prompt; });
+    var ta = h('textarea', { rows: '2', readonly: 'readonly', 'aria-label': 'Prompt to paste in the chat' });
+    var cur = pickable[0];
+    function setPick(m) { cur = m; ta.value = m.prompt; }
+    box.append(h('h4', { text: 'Create a brief for this article' }), h('p', { class: 's', text: 'The brief is built on one question. Its search is already in your thruuu account, so no new search runs.' }));
+    if (!pickable.length) { box.append(h('p', { class: 's', text: 'No searched question in this article has a saved analysis ID.' })); return box; }
+    box.append(h('div', { class: 'step', text: '1. Pick the question the brief is built on' }),
+      h('ul', { class: 'pick' }, pickable.map(function (m, i) {
+        var inp = h('input', { type: 'radio', name: 'pick-' + g.num, onchange: function () { setPick(m); } }); if (i === 0) inp.checked = true;
+        return h('li', {}, h('label', {}, inp, h('span', {}, h('span', { text: m.q }), i === 0 ? h('span', { class: 'lead', text: '  lead question' }) : null)));
+      })));
+    setPick(cur);
+    var copy = h('button', { class: 'btn sm', text: 'Copy prompt', onclick: function () { copyText(ta.value, copy); } });
+    box.append(h('div', { class: 'step', text: '2. Paste this in the chat where you ran the explorer' }), ta, h('div', { class: 'row2' }, copy, h('span', { class: 'hint', text: 'The other questions in the article become H2s when you review the outline. Your assistant asks which template.' })));
+    return box;
+  }
+
+  /* ---------- brands ---------- */
+  var bm = {};
+  ALL.forEach(function (n) { n.brands.forEach(function (b) { var k = norm(b); bm[k] = bm[k] || { key: k, name: b, nodes: [], branches: {} }; if (bm[k].nodes.indexOf(n) < 0) bm[k].nodes.push(n); if (n.branch) bm[k].branches[n.branch] = 1; }); });
+  var TOPICB = (META.topicBrands || []).map(norm);
+  var VARS = {}; Object.keys(META.brandVariants || {}).forEach(function (k) { VARS[norm(k)] = META.brandVariants[k]; });
+  var BRANDS = Object.keys(bm).map(function (k) { var b = bm[k]; b.nb = Object.keys(b.branches).length; b.own = TOPICB.indexOf(k) >= 0; return b; })
+    .sort(function (a, b) { return (a.own - b.own) || b.nodes.length - a.nodes.length || b.nb - a.nb || a.name.localeCompare(b.name); });
+  var OTHERS = BRANDS.filter(function (b) { return !b.own; });
+  var selBrand = META.highlightBrand ? norm(META.highlightBrand) : null;
+  function renderBrands() {
+    var el = document.getElementById('brands'); el.textContent = ''; var nx = document.getElementById('bNext'); nx.textContent = '';
+    document.getElementById('bTitle').textContent = 'Brands the AI Overview names around “' + META.seed + '”';
+    var sub = document.getElementById('bSub');
+    if (!AIO_ON) { sub.textContent = ''; el.append(h('div', { class: 'notice', text: 'AI Overview data is not included on the ' + PLAN + ' plan, so brands named in AI Overviews are not either.' })); return; }
+    if (!BRANDS_ON) { sub.textContent = ''; el.append(h('div', { class: 'notice', text: 'Brands named in AI Overviews are not included on the ' + PLAN + ' plan. AI Overview presence is still shown per question.' })); return; }
+    sub.textContent = 'Counted on the ' + aioN + ' searches where Google showed an AI Overview. Versions of a brand are counted under the main brand, file names and groups are left out. Click a brand to see the questions where it is named.';
+    var max = OTHERS.length ? OTHERS[0].nodes.length : 1;
+    el.append(h('div', { class: 'rhead' }, h('span'), h('span', { text: 'Brand' }), h('span'), h('span', { class: 'n', text: 'Questions' }), h('span', { class: 'n', text: 'Branches' })));
+    OTHERS.forEach(function (b, i) {
+      el.append(h('button', { class: 'rrow' + (selBrand === b.key ? ' sel' : ''), 'aria-expanded': selBrand === b.key ? 'true' : 'false', onclick: function () { selBrand = selBrand === b.key ? null : b.key; renderBrands(); } },
+        h('span', { class: 'rk', text: String(i + 1) }), h('span', { class: 'nm', text: b.name + (VARS[b.key] ? ', incl. ' + VARS[b.key].length + ' variants' : '') }),
+        h('span', { class: 'bar' }, h('i', { style: 'width:' + Math.round(b.nodes.length / max * 100) + '%' })),
+        h('span', { class: 'n', text: String(b.nodes.length) }), h('span', { class: 'n', text: b.nb + ' of ' + LV1 })));
+      if (selBrand === b.key) el.append(h('div', { class: 'bdetail' }, h('h4', { text: 'Named in the AI Overview for' }), h('ul', {}, b.nodes.map(function (n) { return h('li', { text: n.q }); }))));
+    });
+    BRANDS.filter(function (b) { return b.own; }).forEach(function (b) {
+      el.append(h('div', { class: 'rrow own' }, h('span', { class: 'rk' }), h('span', { class: 'nm' }, h('span', { text: b.name }), h('span', { class: 'tag', text: 'your topic' })), h('span', { class: 'bar' }, h('i', { style: 'width:' + Math.min(100, Math.round(b.nodes.length / max * 100)) + '%' })), h('span', { class: 'n', text: String(b.nodes.length) }), h('span', { class: 'n', text: b.nb + ' of ' + LV1 })));
+      if (VARS[b.key]) el.append(h('div', { class: 'own-note', text: b.name + ' is the seed’s own brand, so it is listed last and not ranked. Includes ' + VARS[b.key].join(', ') + '.' }));
+    });
+    if (META.reportIncluded !== false && OTHERS.length) nx.append(nextBox('Track these in an AI Overview report', 'See whether your own domain is cited for these questions. Your assistant asks for the domain and brand name.', 'Create an AI Overview report that tracks the questions found for "' + META.seed + '" in this explorer, for my domain.'));
+  }
+
+  /* ---------- views and header ---------- */
+  var view = META.view || 'tree';
+  function setView(v) { view = v; render(); }
+  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) { b.onclick = function () { setView(b.getAttribute('data-v')); }; });
+  function header() {
+    document.title = 'Question explorer: ' + META.seed;
+    document.getElementById('seed').textContent = META.seed;
+    document.getElementById('meta').textContent = [META.country + ', ' + META.language, META.device, META.date, '~' + META.creditsUsed + ' credits used'].join('  ·  ');
+    var s = [plural(GROUPS.length, 'article group', 'article groups') + ' from ' + plural(META.searchesRun, 'search', 'searches'), plural(META.questionsFound, 'question', 'questions') + ' in the tree', AQ.length + ' in all'];
+    if (AIO_ON) s.push(aioN + ' of ' + analysed.length + ' with an AI Overview'); else s.push('AI Overview data is not included on the ' + PLAN + ' plan');
+    if (AIO_ON && BRANDS_ON) s.push(OTHERS.length + ' brands named' + (BRANDS.some(function (b) { return b.own; }) ? ' besides ' + BRANDS.filter(function (b) { return b.own; }).map(function (b) { return b.name; }).join(', ') : ''));
+    document.getElementById('stats').textContent = s.join('  ·  ');
+    document.getElementById('treeLegend').textContent = (AIO_ON ? 'AIO: Google answered the question with an AI Overview. ' : '') + 'The number on a row is how many questions sit under it. Grey questions were found but not searched.';
+    document.getElementById('foot').textContent = (META.repeatedSkipped || 0) + ' repeated questions skipped. ' + (META.headingsDropped || 0) + ' page headings dropped (first-person, page furniture). Approximate credits, one per search.';
+  }
   function render() {
-    Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) { b.className = b.getAttribute('data-v') === view ? 'on' : ''; });
-    var q = view === 'questions';
-    document.getElementById('split').hidden = !q;
-    document.getElementById('split').className = 'split' + (SEL ? ' has-sel' : '');
-    if (q) panelEl();
-    document.getElementById('bcard').hidden = q;
-    document.getElementById('expand').hidden = !q;
-    document.getElementById('collapse').hidden = !q;
-    var ol = document.getElementById('outline'); ol.textContent = '';
-    var bv = document.getElementById('brands'); bv.textContent = '';
-    if (q) ol.append(liEl(ROOT)); else bv.append(brandView());
+    header();
+    Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) { var on = b.getAttribute('data-v') === view; b.className = on ? 'on' : ''; b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    document.getElementById('split').hidden = view !== 'tree';
+    document.getElementById('acard').hidden = view !== 'all';
+    document.getElementById('gcard').hidden = view !== 'groups';
+    document.getElementById('bcard').hidden = view !== 'brands';
+    document.getElementById('expand').hidden = view !== 'tree';
+    document.getElementById('collapse').hidden = view !== 'tree';
+    if (view === 'tree') { document.getElementById('split').className = 'split' + (SEL ? ' has-sel' : ''); panelEl(); }
+    if (view === 'all') renderAll();
+    if (view === 'groups') renderGroups();
+    if (view === 'brands') renderBrands();
   }
   render();
 })();
