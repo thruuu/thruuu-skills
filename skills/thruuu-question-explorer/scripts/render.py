@@ -23,7 +23,7 @@ FURNITURE = re.compile(r"^(ready for more|who this (course|guide) is for|what yo
 TAIL = re.compile(r"[\s?!.,;:]+$")
 
 SHARE = 4          # shared top-10 URLs that put a question in a group
-SIMILAR = 0.6      # word overlap that places two questions next to each other
+SIMILAR = 0.75     # content-word overlap (Jaccard) that makes two wordings one group
 STOP = set("a an the is are was were be do does did can could should would will of for to in on at by with and or than vs versus i you we my your me it its this that what which who how why when where about as from into".split())
 # capabilities by plan name (first word, lower case)
 PLAN_RULES = {
@@ -232,6 +232,13 @@ def tokens(s):
     return out
 
 
+def qclass(q):
+    w = (re.findall(r"\w+", q.lower()) or [""])[0]
+    if w in ("is", "are", "was", "were", "can", "could", "does", "do", "did", "should", "would", "will"):
+        return "is"
+    return w if w in ("how", "what", "which", "why", "who", "when", "where") else "other"
+
+
 def similar(a, b):
     if not a or not b:
         return False
@@ -431,12 +438,13 @@ def build_all_questions(tree, meta):
     clusters = []
     for k in ranked:
         t = tokens(rows[k]["q"])
+        cl = qclass(rows[k]["q"])
         for c in clusters:
-            if similar(t, c["tok"]):
+            if c["cls"] == cl and similar(t, c["tok"]):
                 c["keys"].append(k)
                 break
         else:
-            clusters.append({"tok": t, "keys": [k]})
+            clusters.append({"tok": t, "cls": cl, "keys": [k]})
     out = []
     for c in clusters:
         vs = []
