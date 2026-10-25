@@ -23,8 +23,6 @@ FURNITURE = re.compile(r"^(ready for more|who this (course|guide) is for|what yo
 TAIL = re.compile(r"[\s?!.,;:]+$")
 
 SHARE = 4          # shared top-10 URLs that put a question in a group
-SIMILAR = 0.8      # content-word overlap (Jaccard) that makes two wordings one group
-STOP = set("a an the is are was were be do does did can could should would will of for to in on at by with and or than vs versus i you we my your me it its this that what which who how why when where about as from into s t ll re ve d m".split())
 # capabilities by plan name (first word, lower case)
 PLAN_RULES = {
     "free": dict(aio=False, brands=False, cluster=False, report=False, cap=0),
@@ -223,30 +221,67 @@ def each_node(node):
 
 
 
-def tokens(s):
-    out = set()
-    for w in re.findall(r"\w+", s.lower()):
-        if w in STOP:
-            continue
-        out.add(w[:-1] if len(w) > 3 and w.endswith("s") else w)
-    return out
+SMALL = set("a an the of and or for to in on at by with from as is are was were be vs via per but nor into".split())
+WORD = re.compile(r"[A-Za-z](?:\.[A-Za-z])+|[A-Za-z][A-Za-z0-9'\u2019]*")
 
 
-def qclass(q):
-    w = (re.findall(r"\w+", q.lower()) or [""])[0]
-    if w in ("is", "are", "was", "were", "can", "could", "does", "do", "did", "should", "would", "will"):
-        return "is"
-    return w if w in ("how", "what", "which", "why", "who", "when", "where") else "other"
+def is_title(q):
+    big = [w for w in WORD.findall(q) if w.lower() not in SMALL]
+    return len(big) >= 3 and sum(1 for w in big if w[0].isupper()) * 2 > len(big)
 
 
-def similar(a, b):
-    if not a or not b:
-        return False
-    if a == b:
-        return True
-    if min(len(a), len(b)) < 3:
-        return False
-    return len(a & b) / float(len(a | b)) > SIMILAR
+def known_caps(tree):
+    """Words whose capitals are meaningful in this run: brand names and capitals inside sentence-case questions."""
+    known = {}
+
+    def add(w):
+        if w.lower() not in SMALL and w[0].isupper() and w != "I":
+            known.setdefault(w.lower(), w)
+    for n in each_node(tree):
+        for b in n.get("brands", []):
+            for w in WORD.findall(b):
+                add(w)
+        qs = [c if isinstance(c, str) else c.get("q", "") for c in n.get("paa", [])]
+        for key in ("headingQuestions", "citedQuestions"):
+            qs += [r["q"] for r in n.get(key, []) if not is_title(r["q"])]
+        for q in qs:
+            for w in WORD.findall(q)[1:]:
+                add(w)
+    return known
+
+
+def sentence_case(q, known):
+    """Title Case headings become sentence case. Acronyms and known proper nouns keep their capitals."""
+    if not is_title(q):
+        return q
+    state = {"first": True}
+
+    def fix(m):
+        w = m.group(0)
+        first, state["first"] = state["first"], False
+        if w == "I" or "." in w or any(c.isdigit() for c in w) or (len(w) >= 2 and w.isupper()) or any(c.isupper() for c in w[1:]):
+            return w
+        if w.lower() in known:
+            return known[w.lower()]
+        return w[0].upper() + w[1:].lower() if first else w.lower()
+    return WORD.sub(fix, q)
+
+
+def case_pass(tree, known):
+    for n in each_node(tree):
+        for key in ("headingQuestions", "citedQuestions"):
+            if key not in n:
+                continue
+            merged, order = {}, []
+            for r in n[key]:
+                q = sentence_case(r["q"], known)
+                k = norm_q(q)
+                if k in merged:
+                    merged[k]["count"] += r["count"]
+                else:
+                    merged[k] = {"q": q, "count": r["count"]}
+                    order.append(k)
+            n[key] = sorted((merged[k] for k in order), key=lambda r: -r["count"])
 
 
 def url_key(u):
@@ -338,25 +373,14 @@ def build_groups(tree, meta):
             if home:
                 g, shared = home
             else:
-                g, shared = {"lead": item, "urls": urls, "members": [], "leaves": []}, None
+                g, shared = {"lead": item, "urls": urls, "members": []}, None
                 groups.append(g)
             g["members"].append((item, shared))
             of_node[id(item)] = g
-        else:
-            q = item if isinstance(item, str) else item["q"]
-            g = of_node.get(id(parent)) if parent is not None else None
-            if g is not None:
-                g["leaves"].append(q)
     out = []
     for i, g in enumerate(groups):
         num = i + 1
         lead = g["lead"]
-        have = {norm_q(n["q"]) for n, _ in g["members"]}
-        leaves = []
-        for q in g["leaves"]:
-            if norm_q(q) not in have:
-                have.add(norm_q(q))
-                leaves.append(q)
         h2, seen = [], set(norm_q(n["q"]) for n, _ in g["members"])
         for src_key, label in (("headingQuestions", "page"), ("citedQuestions", "aio")):
             for n, _ in g["members"]:
@@ -389,29 +413,20 @@ def build_groups(tree, meta):
             else:
                 label = t["foundOn"] if isinstance(t["foundOn"], str) else ""
             topics.append({"term": t["term"], "label": label})
-        shares = [s for _, s in g["members"] if s is not None]
-        if shares:
-            lo, hi = min(shares), max(shares)
-            rng = str(lo) if lo == hi else "%d to %d" % (lo, hi)
-            why = "%d more search%s %s %s of the lead's top 10 results." % (m - 1, "" if m == 2 else "es", "shares" if m == 2 else "share", rng)
-        elif g["urls"]:
-            why = "No other search shares %d or more of its top 10 results." % SHARE
-        else:
-            why = "Result URLs were not captured for this search, so it stands alone."
         members = []
         for n, s in g["members"]:
             sid = n.get("scrapeLogId")
             members.append({"q": n["q"], "scrapeLogId": sid, "thruuuUrl": n.get("thruuuUrl"), "aio": n.get("aio"),
                             "shared": s, "prompt": brief_prompt(n["q"], sid) if sid else None})
             n["group"] = num
-        out.append({"num": num, "lead": lead["q"], "intent": intent(lead["q"]), "members": members, "leaves": leaves,
+        out.append({"num": num, "lead": lead["q"], "intent": intent(lead["q"]), "members": members,
                     "aioCount": sum(1 for n, _ in g["members"] if n.get("aio") in ("present", "degraded")),
-                    "h2": h2, "topics": topics, "why": why})
+                    "h2": h2, "topics": topics})
     return out
 
 
 def build_all_questions(tree, meta):
-    """Every question found, merged by wording, similar ones side by side, sorted by count."""
+    """Every question found, exact repeats merged into xN, sorted by count."""
     seed_key = norm_q(meta["seed"])
     rows, order = {}, []
 
@@ -435,35 +450,12 @@ def build_all_questions(tree, meta):
         for it in n.get("citedQuestions", []):
             add(it["q"], "aio")
     ranked = sorted(order, key=lambda k: (-rows[k]["n"], rows[k]["idx"]))
-    clusters = []
-    for k in ranked:
-        t = tokens(rows[k]["q"])
-        cl = qclass(rows[k]["q"])
-        for c in clusters:
-            if c["cls"] == cl and similar(t, c["tok"]):
-                c["keys"].append(k)
-                break
-        else:
-            clusters.append({"tok": t, "cls": cl, "keys": [k]})
-    out = []
-    for c in clusters:
-        vs = []
-        for k in c["keys"]:
-            r = rows[k]
-            vs.append({"q": r["q"], "n": r["n"], "sources": [SRC_LABEL[x] for x in SRC_ORDER if x in r["src"]]})
-        srcs = [l for x, l in ((x, SRC_LABEL[x]) for x in SRC_ORDER) if any(l in v["sources"] for v in vs)]
-        out.append({"q": vs[0]["q"], "n": sum(v["n"] for v in vs), "sources": srcs, "variants": vs[1:]})
-    out.sort(key=lambda g: -g["n"])
-    return out
-
-
-def flat_questions(groups):
-    return [{"q": g["q"]} for g in groups] + [{"q": v["q"]} for g in groups for v in g["variants"]]
+    return [{"q": rows[k]["q"], "n": rows[k]["n"], "sources": [SRC_LABEL[x] for x in SRC_ORDER if x in rows[k]["src"]]} for k in ranked]
 
 
 def cluster_prompt(meta, rows):
     cap = meta["clusterCap"]
-    qs = [meta["seed"]] + [r["q"] for r in flat_questions(rows)]
+    qs = [meta["seed"]] + [r["q"] for r in rows]
     cut = qs[:cap] if cap else qs
     return len(qs), len(cut), 'Create a topic cluster from these %d questions about "%s":\n' % (len(cut), meta["seed"]) + "\n".join("- " + q for q in cut)
 
@@ -476,19 +468,14 @@ def text_report(data):
         if meta["aioIncluded"]:
             bits.append("AI Overview on %d of %d" % (g["aioCount"], len(g["members"])))
         L.append("%d. %s (%s)" % (g["num"], g["lead"], ", ".join(bits)))
-        L.append("   Searched: " + "; ".join(m["q"] for m in g["members"]))
-        if g["leaves"]:
-            L.append("   Also asked: " + "; ".join(g["leaves"]))
+        L.append("   Similar questions: " + "; ".join(m["q"] for m in g["members"]))
         if g["h2"]:
             L.append("   H2 candidates: " + "; ".join(x["q"] for x in g["h2"][:6]))
-        L.append("   " + g["why"])
         if g["members"][0]["prompt"]:
             L.append("   Brief: " + g["members"][0]["prompt"])
-    L += ["", "# All questions (%d, similar wordings grouped, by count)" % data["allTotal"], ""]
+    L += ["", "# All questions (%d, by count)" % len(data["allQuestions"]), ""]
     for r in data["allQuestions"]:
         L.append("- %s x%d [%s]" % (r["q"], r["n"], ", ".join(r["sources"])))
-        for v in r["variants"]:
-            L.append("    - %s x%d" % (v["q"], v["n"]))
     if meta["aioIncluded"] and meta["brandsIncluded"]:
         bm = {}
         for n in each_node(tree):
@@ -558,7 +545,9 @@ def main():
 
     meta = data["meta"]
     plan_flags(meta)
+    known = known_caps(tree)
     apply_brands(tree, meta)
+    case_pass(tree, known)
     prep_nodes(tree, meta)
     meta["headingsDropped"] = stats["dropped"]
     meta.setdefault("view", "tree")
@@ -566,7 +555,6 @@ def main():
         meta["view"] = "tree"
     data["groups"] = build_groups(tree, meta)
     data["allQuestions"] = build_all_questions(tree, meta)
-    data["allTotal"] = len(flat_questions(data["allQuestions"]))
     total, shown, prompt = cluster_prompt(meta, data["allQuestions"])
     data["cluster"] = {"total": total, "shown": shown, "prompt": prompt}
     data["urlsMissing"] = not any(n.get("urls") for n in each_node(tree))
