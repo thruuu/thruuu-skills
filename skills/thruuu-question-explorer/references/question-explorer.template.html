@@ -512,7 +512,7 @@
       })));
     setPick(cur);
     var copy = h('button', { class: 'btn sm', text: 'Copy prompt', onclick: function () { copyText(ta.value, copy); } });
-    box.append(h('div', { class: 'step', text: '2. Paste this in the chat where you ran the explorer' }), ta, h('div', { class: 'row2' }, copy, h('span', { class: 'hint', text: 'The other questions in the article become H2s when you review the outline. Your assistant asks which template.' })));
+    box.append(h('div', { class: 'step', text: '2. Paste this in the chat where you ran the explorer' }), ta, h('div', { class: 'row2' }, copy, h('span', { class: 'hint', text: 'Your assistant asks which template.' })));
     return box;
   }
 
