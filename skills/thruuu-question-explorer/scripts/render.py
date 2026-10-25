@@ -24,7 +24,7 @@ TAIL = re.compile(r"[\s?!.,;:]+$")
 
 SHARE = 4          # shared top-10 URLs that put a question in a group
 SIMILAR = 0.8      # content-word overlap (Jaccard) that makes two wordings one group
-STOP = set("a an the is are was were be do does did can could should would will of for to in on at by with and or than vs versus i you we my your me it its this that what which who how why when where about as from into".split())
+STOP = set("a an the is are was were be do does did can could should would will of for to in on at by with and or than vs versus i you we my your me it its this that what which who how why when where about as from into s t ll re ve d m".split())
 # capabilities by plan name (first word, lower case)
 PLAN_RULES = {
     "free": dict(aio=False, brands=False, cluster=False, report=False, cap=0),
@@ -246,7 +246,7 @@ def similar(a, b):
         return True
     if min(len(a), len(b)) < 3:
         return False
-    return len(a & b) / float(len(a | b)) >= SIMILAR
+    return len(a & b) / float(len(a | b)) > SIMILAR
 
 
 def url_key(u):
