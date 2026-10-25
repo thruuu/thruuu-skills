@@ -146,7 +146,7 @@ Keep this per analysed node in context. It feeds the HTML data, the closing step
 Run on the merged `headingQuestions` list, before it goes into the page, the CSV or the keyword set.
 
 1. Strip a leading FAQ marker (`Q.`, `Q:`, `Q10.`, `1.`, `2)`), then merge entries that now match (Step 8 normaliser), summing the counts.
-2. Keep a heading that reads as a question or a search query, with or without `?` ("How to set up Claude for writing", "What is X", "Which X", "Pros of X: what do users like"). Drop first-person or narrative headings ("How I...", "What I liked"), calls to action and page furniture ("Ready for more?", "Who this course is for") and editorial labels ("How We Chose..."). When unsure, keep it. This is light cleanup.
+2. Keep a heading that reads as a question or a search query, with or without `?` ("How to set up Claude for writing", "What is X", "Which X", "Pros of X: what do users like"). Headings about the topic in the third person are kept too ("How pros use X", "Where X still loses", "Why switching to X took..."). Drop only (a) first-person headings about the author ("How I...", "What I liked", "Why I switched"), (b) calls to action and page furniture ("Ready for more?", "Who this course is for", "Table of contents"), (c) labels about the article itself ("How We Chose..."). When unsure, keep it. This is light cleanup.
 3. Never reword a kept question beyond the prefix strip. Say in chat how many were dropped.
 
 Things to tell the user when they matter:
