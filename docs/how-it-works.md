@@ -2,7 +2,7 @@
 
 Technical reference for developers and agents: what each skill does, which API calls it makes, how the plan is scored, and the data traps to know about. The method behind the plan is explained on the thruuu blog.
 
-The three skills run over the thruuu REST API v2. Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
+Two kinds of skill. `thruuu-data-pull`, `thruuu-content-strategy` and `thruuu-content-pipeline` run over the thruuu REST API v2 (API key, Python 3). `thruuu-question-explorer` runs over the thruuu MCP server (no key; Python 3 only for its interactive page). Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
 
 ## The skills
 
@@ -12,7 +12,15 @@ The three skills run over the thruuu REST API v2. Rule thresholds and their reas
 | `thruuu-content-strategy` | Profile interview, join, score, site check, plan, review, report, compare, ledger. | The repeatable core, offline on the snapshot (the site check is cached in it), so reruns are reproducible. |
 | `thruuu-content-pipeline` | Push rows or keywords to the Content Pipeline, status, brief digest, approve on request, collect drafts, delete unstarted or stopped items, archive collected ones. | The only skill that spends credits, so every charge sits behind one confirmation step. |
 
-Install the three folders together (for example in `~/.claude/skills/`). They work in Claude Code; on claude.ai only if the thruuu API host is on the network allowlist; not in the Claude API skills runtime, which has no network. The site check needs the WebSearch tool; without it, the sitemap fallback needs network access to the client's site. The API key comes from `THRUUU_API_KEY` (Settings > API, Professional or Agency plan) and is never printed; `THRUUU_API_BASE` defaults to `https://api.thruuu.com`.
+### Works with the MCP: `thruuu-question-explorer`
+
+Builds a question tree from a seed keyword and turns it into four tabs: Question tree, All questions, Article groups and Brands. Install it on its own: one `curl | tar` command for Claude Code, or `thruuu-question-explorer.zip` from the release for claude.ai and the Claude desktop app (README has both). It needs the thruuu MCP server connected ([setup guide](https://thruuu.com/learn/seo-mcp-server/)), not an API key.
+
+- One Google SERP analysis per question (1 credit), read with `get_serp_analysis` and `compact: true`. The cost is quoted first and the run waits for a yes.
+- `scripts/render.py` does the deterministic work: cleans headings, folds brands, builds the lead-based Article groups (a question joins a group when it shares 4 or more of the top 10 result URLs with the group's lead) and the merged All questions list. It writes the page, or with `--text` the same lists for chat.
+- Each tab ends on a copyable prompt that continues in thruuu: a brief from an existing analysis, a topic cluster from the full list, a search intent check, an AI Overview report.
+
+Install the three API skill folders together (for example in `~/.claude/skills/`), or one command per set, see the README. They work in Claude Code; on claude.ai only if the thruuu API host is on the network allowlist; not in the Claude API skills runtime, which has no network. The site check needs the WebSearch tool; without it, the sitemap fallback needs network access to the client's site. The API key comes from `THRUUU_API_KEY` (Settings > API, Professional or Agency plan) and is never printed; `THRUUU_API_BASE` defaults to `https://api.thruuu.com`.
 
 ## Which report answers what
 
