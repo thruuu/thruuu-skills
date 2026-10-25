@@ -14,19 +14,17 @@
   },
   "tree": {
     "q": "marketing automation", "aio": "present", "thruuuUrl": "#",
-    "headingQuestions": [{"q":"What is marketing automation?","count":14},{"q":"How does marketing automation work?","count":9},{"q":"What are the benefits of marketing automation?","count":7},{"q":"Who should use marketing automation?","count":4}],
+    "headingQuestions": [{"q":"What is marketing automation?","count":14},{"q":"How does marketing automation work?","count":9},{"q":"What are the benefits of marketing automation?","count":7},{"q":"Who should use marketing automation?","count":4},{"q":"Q2. What are the benefits of marketing automation?","count":2},{"q":"How I use marketing automation","count":3},{"q":"Ready for more?","count":2},{"q":"Is it safe? </script><b>x</b> & more","count":1}],
     "topics": ["email marketing","lead nurturing","workflows","crm integration","lead scoring","customer journey","segmentation","campaign management"],
     "relatedSearches": ["marketing automation software","marketing automation tools","marketing automation examples","best marketing automation platforms","email marketing automation","marketing automation for small business"],
-    "aioQuestions": ["What is marketing automation?","What can marketing automation do?"],
     "citedQuestions": [{"q":"What are the benefits of marketing automation?","count":6},{"q":"Is marketing automation worth it?","count":3}],
-    "brands": ["HubSpot","Salesforce","Marketo","Mailchimp","ActiveCampaign"],
+    "brands": ["HubSpot","HubSpot Marketing Hub","hubspot.com","Salesforce","Marketo","Mailchimp","ActiveCampaign","ROI.md","Acme Group"],
     "paa": [
       {
         "q": "What is marketing automation?", "aio": "present", "thruuuUrl": "#",
         "headingQuestions": [{"q":"What is marketing automation?","count":12},{"q":"What are examples of marketing automation?","count":8},{"q":"What are the benefits of marketing automation?","count":6}],
         "topics": ["automation software","email campaigns","lead nurturing","customer data","repetitive tasks","workflows","segmentation"],
         "relatedSearches": ["marketing automation definition","what is marketing automation pdf","marketing automation meaning"],
-        "aioQuestions": ["What is marketing automation software?"],
         "citedQuestions": [{"q":"How does marketing automation work?","count":5},{"q":"What are the types of marketing automation?","count":3}],
         "brands": ["HubSpot","Salesforce","Mailchimp"],
         "paa": [
@@ -35,7 +33,6 @@
             "headingQuestions": [{"q":"What are examples of marketing automation?","count":9},{"q":"What is an automated email workflow?","count":5},{"q":"What is a drip campaign?","count":4}],
             "topics": ["welcome emails","abandoned cart","drip campaigns","lead scoring","birthday emails","social scheduling"],
             "relatedSearches": [],
-            "aioQuestions": ["What is an example of marketing automation?"],
             "citedQuestions": [{"q":"What is a drip campaign?","count":4},{"q":"What are triggered emails?","count":3}],
             "brands": ["HubSpot","Mailchimp","Klaviyo","Brevo"],
             "paa": ["What is an example of marketing automation in email?","What is an example of a marketing automation workflow?","Which companies use marketing automation?","What is a marketing automation example for ecommerce?"]
@@ -44,7 +41,6 @@
             "q": "What are the 4 types of marketing automation?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What are the types of marketing automation?","count":8},{"q":"What is email marketing automation?","count":5},{"q":"What is CRM automation?","count":3}],
             "topics": ["email automation","social media","lead management","analytics","ad retargeting","crm"],
-            "aioQuestions": ["What are the main types of marketing automation?"],
             "citedQuestions": [{"q":"What is lead management automation?","count":3},{"q":"What is behavioral targeting?","count":2}],
             "brands": ["Salesforce","Adobe","Marketo"],
             "paa": ["What are the 3 main types of automation?","What is email automation in marketing?","What is social media automation?","What is lead nurturing automation?"]
@@ -53,7 +49,6 @@
             "q": "Is marketing automation the same as CRM?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What is the difference between CRM and marketing automation?","count":10},{"q":"Do I need both a CRM and marketing automation?","count":5},{"q":"What does a CRM do?","count":4}],
             "topics": ["customer records","sales pipeline","lead tracking","contact database","integration","sales and marketing alignment"],
-            "aioQuestions": ["Is marketing automation a CRM?"],
             "citedQuestions": [{"q":"Can a CRM do marketing automation?","count":4},{"q":"What is a marketing CRM?","count":2}],
             "brands": ["HubSpot","Salesforce","Zoho"],
             "paa": ["What is the difference between CRM and marketing automation?","Can marketing automation replace a CRM?","Does Salesforce include marketing automation?","Is HubSpot a CRM or marketing automation?"]
@@ -62,7 +57,6 @@
             "q": "How does marketing automation work?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"How does marketing automation work?","count":9},{"q":"What are marketing automation triggers?","count":6},{"q":"What data do you need for marketing automation?","count":3}],
             "topics": ["triggers","contact data","behavior tracking","workflows","lead scoring","personalization"],
-            "aioQuestions": ["How does marketing automation software work?"],
             "citedQuestions": [{"q":"What are automation triggers?","count":4},{"q":"What is lead scoring?","count":3}],
             "brands": ["HubSpot","ActiveCampaign","Marketo"],
             "paa": ["How do triggers work in marketing automation?","What data does marketing automation use?","How does lead scoring work?","How long does it take to set up marketing automation?"]
@@ -73,7 +67,6 @@
         "q": "What is the best marketing automation tool?", "aio": "present", "thruuuUrl": "#",
         "headingQuestions": [{"q":"What is the best marketing automation software?","count":11},{"q":"What features should marketing automation software have?","count":6},{"q":"How do I compare marketing automation tools?","count":4}],
         "topics": ["hubspot","activecampaign","mailchimp","pricing","integrations","ease of use","reporting"],
-        "aioQuestions": ["What are the best marketing automation tools?"],
         "citedQuestions": [{"q":"Which marketing automation tool is best for small business?","count":5},{"q":"How do I choose marketing automation software?","count":4}],
         "brands": ["HubSpot","Salesforce","ActiveCampaign","Zoho"],
         "paa": [
@@ -81,7 +74,6 @@
             "q": "Which is the best free marketing automation tool?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What is the best free marketing automation software?","count":7},{"q":"Is there a free plan for email automation?","count":5},{"q":"What are the limits of free plans?","count":3}],
             "topics": ["free plan","contact limit","email sends","basic workflows","forms","landing pages"],
-            "aioQuestions": ["Which marketing automation tools are free?"],
             "citedQuestions": [{"q":"Are free marketing automation tools worth it?","count":3},{"q":"What is the best free CRM?","count":2}],
             "brands": ["HubSpot","Mailchimp","Brevo"],
             "paa": ["Is Mailchimp free for marketing automation?","What is the best free email automation tool?","Is there a free version of HubSpot Marketing Hub?","Which free tool is best for small teams?"]
@@ -91,7 +83,6 @@
             "headingQuestions": [{"q":"Is HubSpot good for marketing automation?","count":6},{"q":"What are HubSpot workflows?","count":5},{"q":"How does HubSpot compare to ActiveCampaign?","count":4}],
             "topics": ["workflows","marketing hub","crm integration","lead scoring","reporting","learning curve"],
             "relatedSearches": ["café automation & CRM","HubSpot vs Salesforce à petit prix"],
-            "aioQuestions": ["Is HubSpot good for marketing automation?"],
             "citedQuestions": [{"q":"What does HubSpot Marketing Hub include?","count":4},{"q":"Is HubSpot expensive?","count":3}],
             "brands": ["HubSpot","ActiveCampaign","Salesforce"],
             "paa": ["What are the downsides of HubSpot marketing automation?","Is HubSpot better than Mailchimp?","Does HubSpot Marketing Hub include workflows?","Who are HubSpot's main competitors?"]
@@ -101,14 +92,13 @@
             "headingQuestions": [{"q":"What is the easiest marketing automation tool?","count":6},{"q":"Which tool has the simplest workflow builder?","count":4},{"q":"Do I need technical skills for marketing automation?","count":3}],
             "topics": ["drag and drop","templates","onboarding","workflow builder","no code","support"],
             "relatedSearches": ["easy marketing automation","simple email automation tools"],
-            "aioQuestions": [], "citedQuestions": [], "brands": [],
+"citedQuestions": [], "brands": [],
             "paa": ["Which marketing automation tool is best for beginners?","What is the simplest email automation software?","Is ActiveCampaign easy to learn?","What marketing automation needs no coding?"]
           },
           {
             "q": "What is the difference between HubSpot and Salesforce marketing automation?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"HubSpot vs Salesforce for marketing?","count":8},{"q":"What is Salesforce Marketing Cloud?","count":6},{"q":"Is HubSpot cheaper than Salesforce?","count":5}],
             "topics": ["marketing cloud","pardot","pricing","customization","enterprise","ease of use","integrations"],
-            "aioQuestions": ["What is the difference between HubSpot and Salesforce marketing automation?"],
             "citedQuestions": [{"q":"Is Pardot the same as Salesforce Marketing Cloud?","count":3},{"q":"Which CRM is easier to use?","count":3}],
             "brands": ["HubSpot","Salesforce","Pardot","Marketo"],
             "paa": ["Is Pardot the same as Salesforce Marketing Cloud?","Which is cheaper, HubSpot or Salesforce?","Can HubSpot integrate with Salesforce?","What is Salesforce Marketing Cloud used for?"]
@@ -119,7 +109,6 @@
         "q": "How much does marketing automation cost?", "aio": "present", "thruuuUrl": "#",
         "headingQuestions": [{"q":"How much does marketing automation software cost?","count":10},{"q":"What affects marketing automation pricing?","count":6},{"q":"Is marketing automation expensive?","count":4}],
         "topics": ["monthly price","per contact pricing","free plan","tiers","onboarding fees","annual billing"],
-        "aioQuestions": ["How much does marketing automation cost per month?"],
         "citedQuestions": [{"q":"How is marketing automation priced?","count":5},{"q":"What are hidden costs of marketing automation?","count":3}],
         "brands": ["HubSpot","Mailchimp","ActiveCampaign","Klaviyo"],
         "paa": [
@@ -127,7 +116,6 @@
             "q": "Is there a free marketing automation software?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"Is there free marketing automation software?","count":6},{"q":"What are free alternatives to HubSpot?","count":4},{"q":"What does the free plan include?","count":3}],
             "topics": ["free forever","contact limits","email limit","branding","upgrade","open source"],
-            "aioQuestions": ["What is the best free marketing automation software?"],
             "citedQuestions": [{"q":"What is open source marketing automation?","count":3},{"q":"How do free plans make money?","count":2}],
             "brands": ["HubSpot","Brevo","Mailchimp","Zoho"],
             "paa": ["Is Zoho Campaigns free?","What is free marketing automation for startups?","Are free marketing automation plans limited?","What is the best open source marketing automation?"]
@@ -136,7 +124,6 @@
             "q": "How much does HubSpot marketing automation cost?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"How much does HubSpot Marketing Hub cost?","count":7},{"q":"What is included in each HubSpot tier?","count":5},{"q":"Does HubSpot charge per contact?","count":4}],
             "topics": ["starter","professional","enterprise","contacts tier","onboarding fee","seats"],
-            "aioQuestions": ["How much does HubSpot Marketing Hub cost?"],
             "citedQuestions": [{"q":"Is HubSpot worth the money?","count":3},{"q":"What is the HubSpot Starter plan?","count":3}],
             "brands": ["HubSpot"],
             "paa": ["How much is HubSpot Marketing Hub Professional?","Does HubSpot charge per contact?","Is HubSpot worth the price?","What is HubSpot Marketing Hub Starter?"]
@@ -145,7 +132,6 @@
             "q": "Is marketing automation worth it for small business?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"Is marketing automation worth it for small business?","count":7},{"q":"How do small businesses use marketing automation?","count":5},{"q":"What is the cheapest marketing automation?","count":4}],
             "topics": ["small business","time savings","email list","budget","simple workflows","growth"],
-            "aioQuestions": ["Is marketing automation worth it for small businesses?"],
             "citedQuestions": [{"q":"What should small businesses automate first?","count":4},{"q":"How much time does automation save?","count":3}],
             "brands": ["Mailchimp","ActiveCampaign","Zapier"],
             "paa": ["How much should a small business spend on marketing automation?","What can a small business automate first?","Can I automate marketing with Zapier?","Do small businesses need a CRM?"]
@@ -154,7 +140,7 @@
             "q": "What is the ROI of marketing automation?", "aio": "absent", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What is the ROI of marketing automation?","count":7},{"q":"How do you calculate marketing automation ROI?","count":5},{"q":"What metrics prove automation works?","count":3}],
             "topics": ["conversion rate","revenue per email","time saved","lead quality","cost per lead","attribution"],
-            "aioQuestions": [], "citedQuestions": [], "brands": [],
+"citedQuestions": [], "brands": [],
             "paa": ["How do you measure marketing automation success?","What is a good conversion rate for automated emails?","How much revenue comes from automated emails?","What metrics matter for marketing automation?"]
           }
         ]
@@ -163,7 +149,6 @@
         "q": "How do I start with marketing automation?", "aio": "present", "thruuuUrl": "#",
         "headingQuestions": [{"q":"How do I start with marketing automation?","count":8},{"q":"What do I need before using marketing automation?","count":5},{"q":"How do you build a marketing automation strategy?","count":4}],
         "topics": ["goals","audience segments","content plan","email list","platform choice","first workflow"],
-        "aioQuestions": ["How do I get started with marketing automation?"],
         "citedQuestions": [{"q":"How do you choose a marketing automation platform?","count":4},{"q":"What should you automate first?","count":3}],
         "brands": ["HubSpot","Zapier","Mailchimp"],
         "paa": [
@@ -171,7 +156,6 @@
             "q": "What are the first steps to set up marketing automation?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What are the steps to set up marketing automation?","count":7},{"q":"How do you choose a platform?","count":4},{"q":"What should you automate first?","count":4}],
             "topics": ["audit","goals","platform","contacts import","first campaign","tracking"],
-            "aioQuestions": ["What are the steps to set up marketing automation?"],
             "citedQuestions": [{"q":"How do you import contacts?","count":3},{"q":"How do you set up tracking?","count":2}],
             "brands": ["HubSpot","Mailchimp"],
             "paa": ["How do you choose a marketing automation platform?","What should you automate first?","How do you import contacts into a marketing automation tool?","How do you set up a welcome email series?"]
@@ -180,7 +164,6 @@
             "q": "What is a marketing automation workflow?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"What is a marketing automation workflow?","count":8},{"q":"What triggers a workflow?","count":5},{"q":"What are common workflow examples?","count":4}],
             "topics": ["trigger","condition","action","delay","branching","goal"],
-            "aioQuestions": ["What is a workflow in marketing automation?"],
             "citedQuestions": [{"q":"What is a workflow trigger?","count":4},{"q":"What is a branching workflow?","count":2}],
             "brands": ["HubSpot","ActiveCampaign","Zapier"],
             "paa": ["What is a workflow trigger?","What is an example of a lead nurturing workflow?","How many steps should a workflow have?","How do you test a marketing workflow?"]
@@ -189,7 +172,6 @@
             "q": "Do I need a CRM for marketing automation?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"Do I need a CRM for marketing automation?","count":6},{"q":"What is the best CRM for marketing automation?","count":5},{"q":"How do you connect a CRM to email tools?","count":3}],
             "topics": ["contact records","lifecycle stage","sync","deal stage","integration","data hygiene"],
-            "aioQuestions": ["Do you need a CRM for marketing automation?"],
             "citedQuestions": [{"q":"Which CRM works with email marketing?","count":3},{"q":"What is a CRM integration?","count":2}],
             "brands": ["Salesforce","Zoho"],
             "paa": ["What is the best CRM for small business marketing?","Can you use Google Sheets as a CRM?","How do you connect a CRM to email marketing?","What data should a CRM store?"]
@@ -198,7 +180,6 @@
             "q": "How do you build a lead nurturing campaign?", "aio": "present", "thruuuUrl": "#",
             "headingQuestions": [{"q":"How do you build a lead nurturing campaign?","count":7},{"q":"What is a lead nurturing sequence?","count":5},{"q":"How long should a nurture campaign be?","count":3}],
             "topics": ["nurture sequence","lead scoring","segmentation","content offers","timing","handoff to sales"],
-            "aioQuestions": ["What is a lead nurturing campaign?"],
             "citedQuestions": [{"q":"What is lead scoring?","count":4},{"q":"How many emails make a nurture sequence?","count":3}],
             "brands": ["HubSpot","Marketo","Pardot"],
             "paa": ["What is a lead nurturing email sequence?","How long should a nurture campaign last?","What is lead scoring in nurturing?","How many emails are in a nurture sequence?"]

@@ -26,6 +26,11 @@
       "repeatedSkipped": number   repeated questions skipped (dedup), 0 allowed
       "view":            "questions" | "brands"   optional, default "questions"
       "highlightBrand":  string   optional, brand emphasised in Brand view (default: top brand)
+      "aioIncluded":     boolean  optional, default true. false = the plan excludes AI Overview data
+      "plan":            string   plan name, required when aioIncluded is false
+      "headingsDropped": number   set by render.py (headings removed by cleanup), shown in the footer
+      "brandVariants":   object   set by render.py: brand -> [folded variant names]
+      "topicBrands":     [ string ]   set by render.py: brands that match a seed word, listed last
     },
     "tree": Node     the seed node (level 0)
   }
@@ -40,9 +45,8 @@
     "headingQuestions": [ { "q": string, "count": number } ]
     "topics":           [ string ]
     "relatedSearches":  [ string ]
-    "aioQuestions":     [ string ]
     "citedQuestions":   [ { "q": string, "count": number } ]
-    "brands":           [ string ]                  NOT shown per question. Only feeds the Brand view roll-up.
+    "brands":           [ string ]                  NOT shown per question. Only feeds the Brand view roll-up (render.py folds variants).
     "paa":              [ Node | string ]           children. A plain string = level 3 question, shown muted, not analysed.
   }
 
@@ -220,7 +224,7 @@
   <div class="toolbar">
     <div class="seg" id="seg">
       <button data-v="questions">Questions</button>
-      <button data-v="brands">Brands</button>
+      <button data-v="brands" id="brandsbtn">Brands</button>
     </div>
     <button class="btn" id="expand">Expand all</button>
     <button class="btn" id="collapse">Collapse all</button>
@@ -240,7 +244,7 @@
   <section class="card" id="bcard" hidden>
     <div class="chead">
       <h3>Brands in AI Overviews</h3>
-      <p class="sub">Ranked by the number of questions where the AI Overview names the brand. Select a brand to emphasise it.</p>
+      <p class="sub">Ranked by the number of questions where the AI Overview names the brand. Versions of a brand are counted under the main brand (Claude Opus 5.5 under Claude), file names and groups are left out, and a brand that is also your topic is listed last. Select a brand to emphasise it.</p>
     </div>
     <div id="brands"></div>
   </section>
@@ -310,11 +314,16 @@
       if (n.branch) bm[k].branches[n.branch] = 1;
     });
   });
-  var BRANDS = Object.keys(bm).map(function (k) { bm[k].nb = Object.keys(bm[k].branches).length; return bm[k]; })
-    .sort(function (a, b) { return b.nodes - a.nodes || b.nb - a.nb || a.name.localeCompare(b.name); });
+  var TOPICB = (META.topicBrands || []).map(norm);
+  var VARS = {};
+  Object.keys(META.brandVariants || {}).forEach(function (k) { VARS[norm(k)] = META.brandVariants[k]; });
+  var AIO_ON = META.aioIncluded !== false;
+  var NOAIO = 'AI Overview data is not included on the ' + (META.plan || 'current') + ' plan';
+  var BRANDS = Object.keys(bm).map(function (k) { bm[k].nb = Object.keys(bm[k].branches).length; bm[k].topic = TOPICB.indexOf(k) >= 0; return bm[k]; })
+    .sort(function (a, b) { return (a.topic - b.topic) || b.nodes - a.nodes || b.nb - a.nb || a.name.localeCompare(b.name); });
   var LV1 = ROOT.kids.length;
 
-  var view = META.view === 'brands' ? 'brands' : 'questions';
+  var view = META.view === 'brands' && AIO_ON ? 'brands' : 'questions';
   var selKey = norm(META.highlightBrand || (BRANDS[0] && BRANDS[0].name) || '');
   var showAll = false;
 
@@ -323,8 +332,11 @@
   var analysed = ALL.filter(function (n) { return n.analysed && n.level < 3; });
   var aioN = analysed.filter(function (n) { return n.aio === 'present' || n.aio === 'degraded'; }).length;
   document.getElementById('meta').textContent = [META.country + ', ' + META.language, META.device, META.date, '~' + META.creditsUsed + ' credits used'].join('  ·  ');
-  document.getElementById('stats').textContent = [META.questionsFound + ' questions', META.searchesRun + ' searches run', aioN + ' of ' + analysed.length + ' with an AI Overview', BRANDS.length + ' brands named'].join('  ·  ');
-  document.getElementById('foot').textContent = (META.repeatedSkipped || 0) + ' repeated questions skipped. Approximate credits, one per search.';
+  var statParts = [META.questionsFound + ' questions', META.searchesRun + ' searches run'];
+  if (AIO_ON) statParts.push(aioN + ' of ' + analysed.length + ' with an AI Overview', BRANDS.length + ' brands named');
+  else { statParts.push(NOAIO); document.getElementById('brandsbtn').hidden = true; }
+  document.getElementById('stats').textContent = statParts.join('  ·  ');
+  document.getElementById('foot').textContent = (META.repeatedSkipped || 0) + ' repeated questions skipped. ' + (META.headingsDropped || 0) + ' page headings dropped (first-person, page furniture). Approximate credits, one per search.';
 
   /* brand view */
   function brandView() {
@@ -334,7 +346,7 @@
     list.forEach(function (b, i) {
       el.append(h('div', { class: 'rrow' + (b.key === selKey ? ' sel' : ''), onclick: function () { selKey = b.key; render(); } },
         h('span', { class: 'rk', text: String(i + 1) }),
-        h('span', { class: 'nm', text: b.name }),
+        h('span', { class: 'nm', title: VARS[b.key] ? 'Includes: ' + VARS[b.key].join(', ') : '', text: b.name + (b.topic ? ' (your topic)' : '') + (VARS[b.key] ? ', incl. ' + VARS[b.key].length + ' variants' : '') }),
         h('span', { class: 'bar' }, h('i', { style: 'width:' + Math.round(b.nodes / max * 100) + '%' })),
         h('span', { class: 'n', text: String(b.nodes) }),
         h('span', { class: 'n', text: b.nb + ' of ' + LV1 })));
@@ -355,11 +367,12 @@
       h('h4', { text: 'Top topics' }),
       (n.topics && n.topics.length) ? h('p', { text: n.topics.join(', ') }) : h('div', { class: 'empty', text: 'None found.' }),
       h('h4', { text: 'Related searches' }), list(n.relatedSearches, false));
-    if (n.aio === 'absent') {
+    if (!AIO_ON) {
+      d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: NOAIO }));
+    } else if (n.aio === 'absent') {
       d.append(h('h4', { text: 'AI Overview' }), h('div', { class: 'empty', text: 'No AI Overview appeared on this SERP.' }));
-    } else {
-      d.append(h('h4', { text: 'Questions in the AI Overview' }), list(n.aioQuestions, false),
-        h('h4', { text: 'Questions in cited sources' }), list(n.citedQuestions, true));
+    } else if (n.aio) {
+      d.append(h('h4', { text: 'Questions in cited sources' }), list(n.citedQuestions, true));
     }
     if (n.thruuuUrl) d.append(h('a', { class: 'link', href: n.thruuuUrl, target: '_blank', rel: 'noopener', text: 'Open in thruuu' }));
     return d;
@@ -368,7 +381,7 @@
     var p = document.getElementById('panel'); p.textContent = '';
     if (!SEL) {
       var ic = h('div'); ic.innerHTML = BUBBLE.replace(/width="13" height="13"/, 'width="28" height="28"');
-      p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: 'Question details' }), h('p', { class: 'sub', text: 'Questions on ranking pages, topics and AI Overview questions.' }))),
+      p.append(h('div', { class: 'phead' }, h('div', {}, h('h3', { text: 'Question details' }), h('p', { class: 'sub', text: 'Questions on ranking pages, topics and related searches.' }))),
         h('div', { class: 'pempty' }, ic, h('p', { class: 't', text: 'No question selected' }), h('p', { class: 's', text: 'Click a question in the tree to see the questions asked on its ranking pages.' })));
       return;
     }

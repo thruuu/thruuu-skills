@@ -5,6 +5,7 @@ Usage: python3 render.py <data.json> <out.html>
 
 Stdlib only, no network. Exit 1 with a message on invalid data.
 """
+import copy
 import json
 import os
 import re
@@ -13,6 +14,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "..", "references", "question-explorer.template.html")
 BLOCK = re.compile(r'(^<script type="application/json" id="qe-data">\n)(.*?)(\n</script>)', re.S | re.M)
+
+FAQ_MARK = re.compile(r"^\s*(?:[Qq]\d*[.:]|\d+[.)])\s+")
+FIRST_PERSON = re.compile(r"^(how|what|why)\s+(i|we)\b", re.I)
+FURNITURE = re.compile(r"^(ready for more|who this (course|guide) is for|what you should have now|how this helps|table of contents)$")
+TAIL = re.compile(r"[\s?!.,;:]+$")
 
 STR_KEYS = ("seed", "country", "language", "device", "date")
 NUM_KEYS = ("creditsUsed", "searchesRun", "questionsFound", "repeatedSkipped")
@@ -40,6 +46,10 @@ def check_meta(meta):
         fail("meta.view must be 'questions' or 'brands'")
     if "highlightBrand" in meta and not isinstance(meta["highlightBrand"], str):
         fail("meta.highlightBrand must be a string")
+    if "aioIncluded" in meta and not isinstance(meta["aioIncluded"], bool):
+        fail("meta.aioIncluded must be true or false")
+    if meta.get("aioIncluded") is False and (not isinstance(meta.get("plan"), str) or not meta["plan"].strip()):
+        fail("meta.plan must be a plan name when meta.aioIncluded is false")
 
 
 def dedupe_brands(brands, path):
@@ -52,6 +62,55 @@ def dedupe_brands(brands, path):
             seen.add(b.lower())
             out.append(b)
     return out
+
+
+def norm_q(s):
+    return TAIL.sub("", " ".join(s.lower().split()))
+
+
+def clean_counted(rows, path, stats):
+    """Strip FAQ markers, merge repeats (sum counts), drop first-person and page furniture. Keeps count order."""
+    if not isinstance(rows, list):
+        fail(path + " must be a list")
+    merged, order = {}, []
+    for i, r in enumerate(rows):
+        if not isinstance(r, dict) or not isinstance(r.get("q"), str) or not is_num(r.get("count")):
+            fail(path + "[" + str(i) + "] must be an object with q (string) and count (number)")
+        q = FAQ_MARK.sub("", r["q"]).strip()
+        k = norm_q(q)
+        if not k:
+            stats["dropped"] += 1
+        elif FIRST_PERSON.match(k) or FURNITURE.match(k):
+            stats["dropped"] += 1
+        elif k in merged:
+            merged[k]["count"] += r["count"]
+        else:
+            merged[k] = {"q": q, "count": r["count"]}
+            order.append(k)
+    out = [merged[k] for k in order]
+    out.sort(key=lambda r: -r["count"])
+    return out
+
+
+def fold_brands(all_brands, seed):
+    """Returns (map lower name -> parent display name or None if dropped, variants by parent key, topic keys)."""
+    names = {}
+    for b in all_brands:
+        names.setdefault(b.lower(), b)
+    keep = {k: v for k, v in names.items() if not k.endswith(".md") and "group" not in k}
+    parent = {}
+    for k in keep:
+        cands = [p for p in keep if p != k and (k.startswith(p + " ") or k.startswith(p + "."))]
+        # the shortest listed brand is the root; chains such as "a b c" fold to "a"
+        parent[k] = min(cands, key=len) if cands else k
+    variants = {}
+    for k, p in parent.items():
+        if k != p:
+            variants.setdefault(p, []).append(keep[k])
+    mapping = {k: (keep[parent[k]] if k in keep else None) for k in names}
+    tokens = set(re.findall(r"\w+", seed.lower()))
+    topic = sorted(p for p in set(parent.values()) if p in tokens)
+    return mapping, variants, topic
 
 
 def walk(node, path, stats, brands_seen):
@@ -77,6 +136,12 @@ def walk(node, path, stats, brands_seen):
     rs = node.get("relatedSearches")
     if "relatedSearches" in node and (not isinstance(rs, list) or not all(isinstance(r, str) and r.strip() for r in rs)):
         fail(path + ".relatedSearches must be a list of non-empty strings")
+    if "topics" in node and (not isinstance(node["topics"], list) or not all(isinstance(t, str) for t in node["topics"])):
+        fail(path + ".topics must be a list of strings")
+    for key in ("headingQuestions", "citedQuestions"):
+        if key in node:
+            node[key] = clean_counted(node[key], path + "." + key, stats)
+    node.pop("aioQuestions", None)
     paa = node.get("paa", [])
     if not isinstance(paa, list):
         fail(path + ".paa must be a list")
@@ -92,6 +157,35 @@ def walk_child(child, path, stats, brands_seen):
         return
     # object child: count was added by the caller, recurse for its own children
     walk(child, path, stats, brands_seen)
+
+
+def each_node(node):
+    if isinstance(node, dict):
+        yield node
+        for c in node.get("paa", []):
+            for x in each_node(c):
+                yield x
+
+
+def apply_brands(tree, meta):
+    if meta.get("aioIncluded") is False:
+        for n in each_node(tree):
+            for k in ("brands", "aio", "citedQuestions"):
+                n.pop(k, None)
+        return
+    allb = [b for n in each_node(tree) for b in n.get("brands", [])]
+    mapping, variants, topic = fold_brands(allb, meta["seed"])
+    for n in each_node(tree):
+        if "brands" in n:
+            seen, out = set(), []
+            for b in n["brands"]:
+                p = mapping.get(b.lower())
+                if p and p.lower() not in seen:
+                    seen.add(p.lower())
+                    out.append(p)
+            n["brands"] = out
+    meta["brandVariants"] = {k: v for k, v in variants.items()}
+    meta["topicBrands"] = topic
 
 
 def safe_json(data):
@@ -116,11 +210,19 @@ def main():
     if not isinstance(tree, dict) or not isinstance(tree.get("q"), str) or not tree["q"].strip():
         fail("tree.q must be a non-empty string")
 
-    stats = {"nodes": 0}
+    stats = {"nodes": 0, "dropped": 0}
     brands_seen = set()
     walk(tree, "tree", stats, brands_seen)
 
     meta = data["meta"]
+    apply_brands(tree, meta)
+    meta["headingsDropped"] = stats["dropped"]
+    cleaned = copy.deepcopy(data)
+    for n in each_node(tree):
+        for k in ("headingQuestions", "citedQuestions"):
+            if k in n:
+                n[k] = n[k][:10]
+    brands_seen = {b.lower() for n in each_node(tree) for b in n.get("brands", [])}
     if meta["questionsFound"] != stats["nodes"]:
         sys.stderr.write("warning: meta.questionsFound is %s but the tree draws %s questions (levels 1 to 3)\n"
                          % (meta["questionsFound"], stats["nodes"]))
@@ -137,6 +239,8 @@ def main():
     out = os.path.abspath(sys.argv[2])
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
+    with open(os.path.splitext(out)[0] + ".cleaned.json", "w", encoding="utf-8") as f:
+        json.dump(cleaned, f, ensure_ascii=False, indent=1)
     print(out)
 
 
