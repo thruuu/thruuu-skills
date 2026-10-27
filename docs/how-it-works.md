@@ -2,7 +2,7 @@
 
 Technical reference for developers and agents: what each skill does, which API calls it makes, how the plan is scored, and the data traps to know about. The method behind the plan is explained on the thruuu blog.
 
-Two kinds of skill. `thruuu-data-pull`, `thruuu-content-strategy` and `thruuu-content-pipeline` run over the thruuu REST API v2 (API key, Python 3). `thruuu-question-explorer` runs over the thruuu MCP server (no key; Python 3 only for its interactive page). Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
+Two kinds of skill. `thruuu-data-pull`, `thruuu-content-strategy` and `thruuu-content-pipeline` run over the thruuu REST API v2 (API key, Python 3). `thruuu-question-explorer` runs over the thruuu MCP server (MCP key; Python 3 only for its interactive page). Rule thresholds and their reasons: `skills/thruuu-content-strategy/references/decision-model.md`. API field notes: `skills/thruuu-data-pull/references/api-fields.md`. Full API references: [AI Overview monitoring](https://thruuu.com/learn/aio-monitoring-api/), [Topic Clusters](https://thruuu.com/learn/topic-clusters-api/), [Content Pipeline](https://thruuu.com/learn/content-pipeline-api/).
 
 ## The skills
 

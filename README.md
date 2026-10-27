@@ -1,8 +1,8 @@
 # thruuu skills
 
-Ready-made skills that turn your thruuu data into a content plan you can act on every month: which pages to create, which to refresh, and how to take them all the way to a draft.
+Ready-made skills that put thruuu to work inside your AI assistant: research what people ask, plan which pages to create or refresh, track AI Overviews, and take pages all the way to a brief and a draft.
 
-They work with any AI agent that can read Markdown instructions and run Python scripts: Claude Code, Claude, or your own agent. Each skill is a `SKILL.md` file (the instructions) plus small scripts. Some work through the thruuu MCP server (no key, no code), some through the [thruuu REST API](docs/).
+They work with any AI agent that can read Markdown instructions and run Python scripts: Claude Code, Claude, or your own agent. Each skill is a `SKILL.md` file (the instructions) plus small scripts. Some work through the thruuu MCP server (an MCP key, no code), some through the [thruuu REST API](docs/) (an API key and Python 3).
 
 Want to build your own agent instead? See [thruuu-claude-content-strategist](https://github.com/thruuu/thruuu-claude-content-strategist).
 
@@ -12,11 +12,11 @@ Two kinds. Pick by how you work with thruuu.
 
 ### Works with the thruuu MCP
 
-No API key and no code. Your AI assistant uses thruuu through the MCP server, so you only connect it once.
+Needs your thruuu MCP key, no code and no API key. Connect the MCP server to your assistant once, with the key from API & Bulk Tools > MCP in thruuu.
 
 | Skill | Type | What it does |
 |---|---|---|
-| [`thruuu-question-explorer`](skills/thruuu-question-explorer/SKILL.md) | MCP | Builds an interactive question tree from a seed keyword: the People Also Asked questions three levels deep, the questions asked on ranking pages, the topics they cover, related searches and, on plans that include them, what Google's AI Overview says and which brands it names. Shown as one HTML page, with a CSV export. Needs the thruuu MCP server, not the API key. Quotes the credit cost (about 21 credits for three levels) and waits for your yes. |
+| [`thruuu-question-explorer`](skills/thruuu-question-explorer/SKILL.md) | MCP | Builds an interactive question explorer from a seed keyword, in four tabs: a question tree (People Also Asked three levels deep), all questions found (People Also Asked, ranking page headings, AI Overview sources), article groups showing which questions fit one article, and, on plans that include them, the brands the AI Overview names. Shown as one HTML page, with a CSV export. Uses your MCP key, not the API key. Quotes the credit cost (about 21 credits for three levels) and waits for your yes. |
 
 What you need:
 
