@@ -28,6 +28,8 @@ def check_description(skill, skill_md):
                 n = len(line[len("description:"):].strip())
                 if n > MAX_DESCRIPTION:
                     sys.exit("build-skill-zips: skills/%s description is %d characters, claude.ai allows %d" % (skill, n, MAX_DESCRIPTION))
+                if "<" in line or ">" in line:
+                    sys.exit("build-skill-zips: skills/%s description contains < or >, which claude.ai rejects as XML tags" % skill)
                 return
     sys.exit("build-skill-zips: skills/%s has no description in SKILL.md" % skill)
 
