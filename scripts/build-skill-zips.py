@@ -13,6 +13,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILLS = os.path.join(ROOT, "skills")
 DIST = os.path.join(ROOT, "dist")
+MAX_DESCRIPTION = 1024  # claude.ai rejects a longer SKILL.md description
 STAMP = (2026, 1, 1, 0, 0, 0)  # fixed timestamp so the same files give the same zip
 
 
@@ -20,10 +21,22 @@ def skip(name):
     return name == "__pycache__" or name.startswith(".") or name.endswith(".pyc")
 
 
+def check_description(skill, skill_md):
+    with open(skill_md, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("description:"):
+                n = len(line[len("description:"):].strip())
+                if n > MAX_DESCRIPTION:
+                    sys.exit("build-skill-zips: skills/%s description is %d characters, claude.ai allows %d" % (skill, n, MAX_DESCRIPTION))
+                return
+    sys.exit("build-skill-zips: skills/%s has no description in SKILL.md" % skill)
+
+
 def build(skill):
     src = os.path.join(SKILLS, skill)
     if not os.path.isfile(os.path.join(src, "SKILL.md")):
         sys.exit("build-skill-zips: skills/%s has no SKILL.md" % skill)
+    check_description(skill, os.path.join(src, "SKILL.md"))
     out = os.path.join(DIST, skill + ".zip")
     count = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
